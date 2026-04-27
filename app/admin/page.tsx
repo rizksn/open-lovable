@@ -336,8 +336,8 @@ export default function AdminHomePage() {
 
       setIsSaveAppOpen(false);
       setAppName("");
-
-      router.push(`/apps/${data.slug}`);
+      setSaveAppError(null);
+      setStatus("success");
     } finally {
       setIsSavingApp(false);
     }
@@ -437,6 +437,7 @@ export default function AdminHomePage() {
 
     setIsDeletingApp(true);
     setDeleteAppError(null);
+    setIsDeleteAppOpen(false);
 
     try {
       const res = await fetch(`/api/apps/${currentAppId}`, {
@@ -450,7 +451,7 @@ export default function AdminHomePage() {
         return;
       }
 
-      const resetRes = await fetch("/api/outrival-reset", {
+      const resetRes = await fetch("/api/generated-app/reset", {
         method: "POST",
       });
 
@@ -471,7 +472,7 @@ export default function AdminHomePage() {
       setLastFilesWritten([]);
       setLatestPrompt("");
       setVersions([]);
-      setIsDeleteAppOpen(false);
+      setDeleteAppError(null);
       setPreviewKey((key) => key + 1);
 
       if (selectedOrganization) {
@@ -701,6 +702,17 @@ export default function AdminHomePage() {
                     >
                       Delete App
                     </button>
+                  )}
+
+                  {currentAppSlug && (
+                    <a
+                      href={`/apps/${currentAppSlug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
+                    >
+                      Open public app
+                    </a>
                   )}
                 </div>
               </div>
@@ -1226,6 +1238,7 @@ export default function AdminHomePage() {
             </div>
           </div>
         )}
+
         <section className="min-w-0 flex-1 overflow-hidden p-5">
           <div className="flex h-full flex-col overflow-hidden rounded-[10px] border border-white/10 bg-slate-900/60 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
             <div className="mb-3 flex shrink-0 items-center justify-between px-1">

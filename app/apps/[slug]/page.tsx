@@ -1,3 +1,39 @@
+/**
+ * Public published-app route.
+ *
+ * This page handles URLs like:
+ *   /apps/[slug]
+ *
+ * Its job is to load a generated app by its public slug and render the
+ * published version for end users.
+ *
+ * Important:
+ * - This is NOT the admin/builder preview.
+ * - The admin preview uses the local generated-app Vite iframe.
+ * - This route should only expose apps that have been explicitly published.
+ *
+ * Current flow:
+ * 1. Read the app slug from the URL.
+ * 2. Query Supabase for the matching app.
+ * 3. If no app exists, show a public "not found" state.
+ * 4. If the app exists, render the public app shell.
+ *
+ * Publish flow expectation:
+ * - Saved versions live in the private/internal `apps` storage bucket.
+ * - The active public version is copied into the `published-apps` bucket.
+ * - The `apps` table tracks publish state via:
+ *     is_published
+ *     published_version_id
+ *     published_at
+ *
+ * Current responsibility:
+ * - Only load apps where `is_published = true`.
+ * - Render the public app shell.
+ *
+ * Next responsibility:
+ * - Render or iframe the published artifact from `published-apps`.
+ */
+
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { DashboardHeader } from "@/components/navigation/DashboardHeader";
 
@@ -14,8 +50,11 @@ export default async function PublicAppPage({ params }: PublicAppPageProps) {
 
   const { data: app, error } = await supabase
     .from("apps")
-    .select("id, name, slug, status")
+    .select(
+      "id, name, slug, status, is_published, published_version_id, published_at",
+    )
     .eq("slug", slug)
+    .eq("is_published", true)
     .single();
 
   if (error) {
@@ -26,7 +65,9 @@ export default async function PublicAppPage({ params }: PublicAppPageProps) {
     return (
       <main className="min-h-screen bg-[#050505] p-8 text-white">
         <h1 className="text-2xl font-semibold">App not found</h1>
-        <p className="mt-2 text-white/50">No app exists for slug: {slug}</p>
+        <p className="mt-2 text-white/50">
+          No published app exists for slug: {slug}
+        </p>
       </main>
     );
   }
@@ -39,10 +80,18 @@ export default async function PublicAppPage({ params }: PublicAppPageProps) {
 
       <p className="mt-2 text-white/50">Slug: {app.slug}</p>
 
-      <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-        <p className="text-sm text-white/50">
-          This will render the generated app UI.
+      {app.published_at && (
+        <p className="mt-1 text-sm text-white/40">
+          Published: {new Date(app.published_at).toLocaleString()}
         </p>
+      )}
+
+      <div className="mt-8 overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl">
+        <iframe
+          src={`/published/${app.slug}`}
+          className="h-[720px] w-full border-0"
+          title={app.name}
+        />
       </div>
     </main>
   );

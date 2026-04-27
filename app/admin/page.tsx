@@ -436,6 +436,33 @@ export default function AdminHomePage() {
     }
   }
 
+  async function handlePublishApp() {
+    if (!currentAppId) return;
+
+    setErrorMessage(null);
+    setStatus("validating");
+
+    try {
+      const res = await fetch(`/api/apps/${currentAppId}/publish`, {
+        method: "POST",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setErrorMessage(data.error ?? "Failed to publish app.");
+        setStatus("error");
+        return;
+      }
+
+      setStatus("success");
+    } catch (error) {
+      console.error("[handlePublishApp] failed:", error);
+      setErrorMessage("Something went wrong while publishing the app.");
+      setStatus("error");
+    }
+  }
+
   async function handleDeleteApp() {
     if (!currentAppId) return;
 
@@ -695,16 +722,14 @@ export default function AdminHomePage() {
                     </button>
                   )}
 
-                  {currentAppId && (
+                  {selectedOrganization && currentAppId && hasGeneratedApp && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setDeleteAppError(null);
-                        setIsDeleteAppOpen(true);
-                      }}
-                      className="mt-2 h-9 w-full rounded-lg border border-red-400/20 bg-red-400/10 px-3 text-xs font-bold text-red-200 transition hover:border-red-300/30 hover:bg-red-400/15"
+                      onClick={handlePublishApp}
+                      disabled={status === "validating"}
+                      className="h-20 rounded-lg w-full border border-emerald-400/30 bg-emerald-400/10 px-3 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      Delete App
+                      Publish
                     </button>
                   )}
 
@@ -713,10 +738,23 @@ export default function AdminHomePage() {
                       href={`/apps/${currentAppSlug}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
+                      className="rounded-lg w-full border h-20 border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
                     >
                       Open public app
                     </a>
+                  )}
+
+                  {currentAppId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteAppError(null);
+                        setIsDeleteAppOpen(true);
+                      }}
+                      className="mt-2 h-20 w-full rounded-lg border border-red-400/20 bg-red-400/10 px-3 text-xs font-bold text-red-200 transition hover:border-red-300/30 hover:bg-red-400/15"
+                    >
+                      Delete App
+                    </button>
                   )}
                 </div>
               </div>

@@ -5,7 +5,6 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 type LoadedFile = {
   path: string;
-  content: string;
 };
 
 async function readFilesRecursively(
@@ -16,20 +15,45 @@ async function readFilesRecursively(
 
   const files = await Promise.all(
     entries.map(async (entry) => {
+      if (entry.name === "node_modules") {
+        return [];
+      }
+
       const fullPath = path.join(directoryPath, entry.name);
 
       if (entry.isDirectory()) {
         return readFilesRecursively(fullPath, basePath);
       }
 
-      const content = await fs.readFile(fullPath, "utf8");
       const relativePath = path.relative(basePath, fullPath);
 
-      return [{ path: relativePath, content }];
+      return [{ path: relativePath }];
     }),
   );
 
   return files.flat();
+}
+
+async function copyDirectoryContents(
+  sourcePath: string,
+  destinationPath: string,
+) {
+  const entries = await fs.readdir(sourcePath, { withFileTypes: true });
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.name !== "node_modules")
+      .map((entry) =>
+        fs.cp(
+          path.join(sourcePath, entry.name),
+          path.join(destinationPath, entry.name),
+          {
+            recursive: true,
+            force: true,
+          },
+        ),
+      ),
+  );
 }
 
 export async function GET(
@@ -94,6 +118,9 @@ export async function GET(
       latestVersion.storage_path,
     );
 
+    console.log("[latest-version] storage_path:", latestVersion.storage_path);
+    console.log("[latest-version] versionPath:", versionPath);
+
     try {
       await fs.access(versionPath);
     } catch {
@@ -102,6 +129,23 @@ export async function GET(
         { status: 404 },
       );
     }
+
+    const generatedAppPath = path.join(process.cwd(), "generated-app");
+
+    const entries = await fs.readdir(generatedAppPath, { withFileTypes: true });
+
+    await Promise.all(
+      entries
+        .filter((entry) => entry.name !== "node_modules")
+        .map((entry) =>
+          fs.rm(path.join(generatedAppPath, entry.name), {
+            recursive: true,
+            force: true,
+          }),
+        ),
+    );
+
+    await copyDirectoryContents(versionPath, generatedAppPath);
 
     const files = await readFilesRecursively(versionPath);
 
@@ -119,6 +163,7 @@ export async function GET(
         storagePath: latestVersion.storage_path,
         createdAt: latestVersion.created_at,
       },
+      hydratedPath: "generated-app",
       files,
     });
   } catch (error) {

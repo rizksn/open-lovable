@@ -30,6 +30,14 @@ type AppSummary = {
   created_at: string;
 };
 
+type AppVersionSummary = {
+  id: string;
+  versionNumber: number;
+  prompt: string;
+  storagePath: string;
+  createdAt: string;
+};
+
 export default function AdminHomePage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -38,8 +46,10 @@ export default function AdminHomePage() {
   const [prompt, setPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [hasGeneratedApp, setHasGeneratedApp] = useState(false);
+  const [previewKey, setPreviewKey] = useState(0);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [lastFilesWritten, setLastFilesWritten] = useState<string[]>([]);
+  const [latestPrompt, setLatestPrompt] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<
     "idle" | "generating" | "validating" | "error" | "success"
@@ -78,6 +88,16 @@ export default function AdminHomePage() {
   const [isLoadingApps, setIsLoadingApps] = useState(false);
   const [isLoadingSelectedApp, setIsLoadingSelectedApp] = useState(false);
   const [selectAppError, setSelectAppError] = useState<string | null>(null);
+
+  /* Version history modal state */
+  const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+  const [versions, setVersions] = useState<AppVersionSummary[]>([]);
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false);
+  const [isLoadingSelectedVersion, setIsLoadingSelectedVersion] =
+    useState(false);
+  const [versionHistoryError, setVersionHistoryError] = useState<string | null>(
+    null,
+  );
 
   const mode = hasGeneratedApp ? "edit" : "create";
 
@@ -197,6 +217,7 @@ export default function AdminHomePage() {
       }
 
       const filesWritten = data.filesWritten ?? [];
+      setLatestPrompt(submittedPrompt);
 
       setLastFilesWritten(filesWritten);
 
@@ -211,6 +232,7 @@ export default function AdminHomePage() {
       ]);
 
       setHasGeneratedApp(true);
+      setPreviewKey((key) => key + 1);
       setPrompt("");
       setStatus("success");
     } catch (error) {
@@ -228,36 +250,66 @@ export default function AdminHomePage() {
   }
 
   /**
-   * Saves the currently generated app as a new app under the selected organization.
-   * The backend creates the app row, creates version v1,
-   * and snapshots generated-app into storage/apps/{org}/{app}/versions/v1.
+   * Saves the current generated app.
+   *
+   * If this is a new app, the backend creates the app row,
+   * creates version v1, and snapshots generated-app.
+   *
+   * If this is an existing app, the backend creates a new app_versions row
+   * and snapshots generated-app as the next version.
    */
   async function handleSaveApp() {
     if (!user) return;
 
-    if (!selectedOrganization) {
-      alert("Please select an organization before saving an app.");
-      return;
-    }
-
-    if (!appName.trim()) {
-      setSaveAppError("App name is required.");
-      return;
-    }
-
-    const latestPrompt = history[0]?.prompt ?? prompt;
-
-    const payload = {
-      organizationId: selectedOrganization.id,
-      name: appName.trim(),
-      prompt: latestPrompt,
-      files: lastFilesWritten,
-    };
+    const promptToSave =
+      latestPrompt || prompt || `Saved version of ${currentAppName ?? "app"}`;
 
     setIsSavingApp(true);
     setSaveAppError(null);
 
     try {
+      if (currentAppId) {
+        const res = await fetch(`/api/apps/${currentAppId}/versions`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            prompt: promptToSave,
+            files: lastFilesWritten,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!data.success) {
+          setSaveAppError(data.error ?? "Failed to save app version.");
+          return;
+        }
+
+        setIsSaveAppOpen(false);
+        setAppName("");
+
+        return;
+      }
+
+      if (!selectedOrganization) {
+        alert("Please select an organization before saving an app.");
+        return;
+      }
+
+      if (!appName.trim()) {
+        setSaveAppError("App name is required.");
+        return;
+      }
+
+      const payload = {
+        organizationId: selectedOrganization.id,
+        name: appName.trim(),
+        prompt: latestPrompt,
+        files: lastFilesWritten,
+      };
+
       const res = await fetch("/api/apps", {
         method: "POST",
         headers: {
@@ -290,13 +342,15 @@ export default function AdminHomePage() {
     setIsLoadingSelectedApp(true);
     setSelectAppError(null);
     setErrorMessage(null);
+    setStatus("validating");
 
     try {
       const res = await fetch(`/api/apps/${app.id}/latest-version`);
       const data = await res.json();
 
-      if (!data.success) {
+      if (!res.ok || !data.success) {
         setSelectAppError(data.error ?? "Failed to load app.");
+        setStatus("error");
         return;
       }
 
@@ -305,9 +359,13 @@ export default function AdminHomePage() {
       setCurrentAppName(data.app.name);
 
       setLastFilesWritten(
-        data.files.map((file: { path: string }) => file.path),
+        Array.isArray(data.files)
+          ? data.files.map((file: { path: string }) => file.path)
+          : [],
       );
+
       setHasGeneratedApp(true);
+      setPreviewKey((key) => key + 1);
       setHistory([]);
       setPrompt("");
       setStatus("success");
@@ -315,8 +373,57 @@ export default function AdminHomePage() {
     } catch (error) {
       console.error("[handleSelectApp] failed:", error);
       setSelectAppError("Something went wrong while loading the app.");
+      setStatus("error");
     } finally {
       setIsLoadingSelectedApp(false);
+    }
+  }
+
+  async function handleOpenVersionHistory() {
+    if (!currentAppId) return;
+
+    setIsLoadingVersions(true);
+    setVersionHistoryError(null);
+    setIsVersionHistoryOpen(true);
+
+    try {
+      const res = await fetch(`/api/apps/${currentAppId}/versions`);
+      const data = await res.json();
+
+      if (!data.success) {
+        setVersionHistoryError(data.error ?? "Failed to load versions.");
+        return;
+      }
+
+      setVersions(data.versions ?? []);
+    } finally {
+      setIsLoadingVersions(false);
+    }
+  }
+
+  async function handleLoadVersion(versionNumber: number) {
+    if (!currentAppId) return;
+
+    setIsLoadingSelectedVersion(true);
+    setVersionHistoryError(null);
+
+    try {
+      const res = await fetch(
+        `/api/apps/${currentAppId}/versions/${versionNumber}`,
+      );
+      const data = await res.json();
+
+      if (!data.success) {
+        setVersionHistoryError(data.error ?? "Failed to load version.");
+        return;
+      }
+
+      setLatestPrompt(data.version?.prompt ?? "");
+      setPreviewKey((key) => key + 1);
+      setIsVersionHistoryOpen(false);
+      setStatus("success");
+    } finally {
+      setIsLoadingSelectedVersion(false);
     }
   }
 
@@ -369,14 +476,6 @@ export default function AdminHomePage() {
    */
   useEffect(() => {
     fetchOrganizations();
-  }, []);
-
-  /**
-   * Temporary dev sanity check for Supabase client availability.
-   * Remove this once I no longer need the console confirmation.
-   */
-  useEffect(() => {
-    console.log("Supabase connected:", supabase);
   }, []);
 
   /**
@@ -525,6 +624,16 @@ export default function AdminHomePage() {
                   <p className="truncate text-sm font-semibold text-white">
                     {currentAppName ?? "New app"}
                   </p>
+
+                  {currentAppId && (
+                    <button
+                      type="button"
+                      onClick={handleOpenVersionHistory}
+                      className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 text-xs font-bold text-slate-300 transition hover:border-cyan-300/25 hover:bg-cyan-300/10 hover:text-cyan-100"
+                    >
+                      Version History
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -624,17 +733,12 @@ export default function AdminHomePage() {
                     <button
                       type="button"
                       onClick={() => {
-                        if (!currentAppId) {
-                          setSaveAppError(null);
-                          setIsSaveAppOpen(true);
-                          return;
-                        }
-
-                        console.log("Save existing app:", currentAppId);
+                        setSaveAppError(null);
+                        setIsSaveAppOpen(true);
                       }}
                       className="mt-3 h-10 w-full rounded-xl bg-cyan-300 px-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
                     >
-                      Save app
+                      {currentAppId ? "Save new version" : "Save app"}
                     </button>
                   )}
                 </div>
@@ -718,6 +822,7 @@ export default function AdminHomePage() {
           </div>
         </aside>
 
+        {/* Create Organization modal */}
         {isCreateOrgOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
@@ -772,6 +877,7 @@ export default function AdminHomePage() {
           </div>
         )}
 
+        {/* Select Organization modal */}
         {isSelectOrgOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
@@ -825,23 +931,28 @@ export default function AdminHomePage() {
           </div>
         )}
 
+        {/* Save App / Save Version modal */}
         {isSaveAppOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
               <h2 className="text-xl font-bold tracking-tight">
-                Name your app
+                {currentAppId ? "Save new version" : "Name your app"}
               </h2>
 
               <p className="mt-2 text-sm leading-relaxed text-slate-500">
-                This app will be saved under {selectedOrganization?.name}.
+                {currentAppId
+                  ? `This will save a new version of ${currentAppName ?? "this app"}.`
+                  : `This app will be saved under ${selectedOrganization?.name}.`}
               </p>
 
-              <input
-                value={appName}
-                onChange={(e) => setAppName(e.target.value)}
-                placeholder="App name"
-                className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
-              />
+              {!currentAppId && (
+                <input
+                  value={appName}
+                  onChange={(e) => setAppName(e.target.value)}
+                  placeholder="App name"
+                  className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
+                />
+              )}
 
               {saveAppError && (
                 <p className="mt-3 text-sm font-medium text-red-300">
@@ -865,16 +976,21 @@ export default function AdminHomePage() {
                 <button
                   type="button"
                   onClick={handleSaveApp}
-                  disabled={isSavingApp || !appName.trim()}
+                  disabled={isSavingApp || (!currentAppId && !appName.trim())}
                   className="h-11 rounded-xl bg-cyan-300 px-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
                 >
-                  {isSavingApp ? "Saving..." : "Save app"}
+                  {isSavingApp
+                    ? "Saving..."
+                    : currentAppId
+                      ? "Save version"
+                      : "Save app"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* Select App modal */}
         {isSelectAppOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
             <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
@@ -922,6 +1038,82 @@ export default function AdminHomePage() {
           </div>
         )}
 
+        {/* Version History modal */}
+        {isVersionHistoryOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
+              <h2 className="text-xl font-bold tracking-tight">
+                Version History
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                {currentAppName ?? "Selected app"}
+              </p>
+
+              {versionHistoryError && (
+                <p className="mt-3 text-sm font-medium text-red-300">
+                  {versionHistoryError}
+                </p>
+              )}
+
+              <div className="mt-5 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+                {isLoadingVersions ? (
+                  <p className="text-sm text-slate-500">Loading versions...</p>
+                ) : versions.length === 0 ? (
+                  <p className="text-sm text-slate-500">No versions found.</p>
+                ) : (
+                  versions.map((version, index) => (
+                    <div
+                      key={version.id}
+                      className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3.5"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-white">
+                            v{version.versionNumber}{" "}
+                            {index === 0 && (
+                              <span className="text-xs font-semibold text-cyan-300">
+                                Latest
+                              </span>
+                            )}
+                          </p>
+
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                            {version.prompt}
+                          </p>
+
+                          <p className="mt-2 text-[11px] font-medium text-slate-600">
+                            {new Date(version.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleLoadVersion(version.versionNumber)
+                          }
+                          disabled={isLoadingSelectedVersion}
+                          className="h-8 shrink-0 rounded-lg bg-cyan-300 px-3 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
+                        >
+                          Load
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsVersionHistoryOpen(false)}
+                className="mt-6 h-11 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         <section className="min-w-0 flex-1 overflow-hidden p-5">
           <div className="flex h-full flex-col overflow-hidden rounded-[10px] border border-white/10 bg-slate-900/60 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
             <div className="mb-3 flex shrink-0 items-center justify-between px-1">
@@ -944,6 +1136,7 @@ export default function AdminHomePage() {
 
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl">
               <iframe
+                key={previewKey}
                 src="http://localhost:5173"
                 className="h-full w-full border-0"
                 title="Generated App Preview"

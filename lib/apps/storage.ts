@@ -26,6 +26,30 @@ export function appVersionLocalPath(params: {
   );
 }
 
+async function copyDirectoryContentsWithoutNodeModules(
+  sourcePath: string,
+  destinationPath: string,
+) {
+  const entries = await fs.readdir(sourcePath, { withFileTypes: true });
+
+  await fs.mkdir(destinationPath, { recursive: true });
+
+  await Promise.all(
+    entries
+      .filter((entry) => entry.name !== "node_modules")
+      .map((entry) =>
+        fs.cp(
+          path.join(sourcePath, entry.name),
+          path.join(destinationPath, entry.name),
+          {
+            recursive: true,
+            force: true,
+          },
+        ),
+      ),
+  );
+}
+
 export async function copyGeneratedAppToLocalVersion(params: {
   organizationId: string;
   appSlug: string;
@@ -35,8 +59,8 @@ export async function copyGeneratedAppToLocalVersion(params: {
   const to = appVersionLocalPath(params);
 
   await fs.rm(to, { recursive: true, force: true });
-  await fs.mkdir(path.dirname(to), { recursive: true });
-  await fs.cp(from, to, { recursive: true });
+
+  await copyDirectoryContentsWithoutNodeModules(from, to);
 
   return appVersionStoragePath(params);
 }

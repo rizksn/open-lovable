@@ -19,14 +19,13 @@ body {
 }
 
 h1 {
-  font-size: 3rem;
-  font-weight: bold;
+  font-size: 2.5rem;
 }
 
 p {
-  font-size: 1.25rem;
+  font-size: 1.125rem;
 }
 
-.button {
-  @apply px-6 py-2 bg-blue-500 text-white rounded-lg shadow-md transition-all duration-300 hover:bg-blue-600 hover:shadow-lg;
+button {
+  @apply px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition-all duration-200;
 }

@@ -1,6 +1,31 @@
+/**
+ * App collection route.
+ *
+ * POST /api/apps
+ * Creates a brand-new app for an organization and saves its first version.
+ *
+ * Flow:
+ * 1. Validate request payload.
+ * 2. Authenticate the current Supabase user.
+ * 3. Verify the user can create apps for the requested organization.
+ * 4. Create the app metadata row in `apps`.
+ * 5. Upload the current `generated-app/` workspace source files to Supabase Storage.
+ * 6. Create the initial `app_versions` row pointing to that saved source snapshot.
+ *
+ * Important design note:
+ * `generated-app/` is only the temporary live builder workspace.
+ * Supabase Storage is the durable source of truth for saved app versions.
+ *
+ * GET /api/apps?organizationId=...
+ * Lists apps for the selected organization, ordered newest first.
+ *
+ * Future hardening:
+ * tighten organization/role checks for institutional users and align with RLS policies.
+ */
+
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { copyGeneratedAppToLocalVersion } from "@/lib/apps/storage";
+import { uploadGeneratedAppToSupabaseVersion } from "@/lib/apps/storage";
 
 type CreateAppRequest = {
   organizationId: string;
@@ -99,8 +124,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // ✅ snapshot current preview workspace into permanent app version folder
-    const storagePath = await copyGeneratedAppToLocalVersion({
+    const storagePath = await uploadGeneratedAppToSupabaseVersion({
+      supabase: supabaseServer,
       organizationId: body.organizationId,
       appSlug: app.slug,
       versionNumber: 1,

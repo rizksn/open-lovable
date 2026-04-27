@@ -369,12 +369,16 @@ export default function AdminHomePage() {
           : [],
       );
 
-      setHasGeneratedApp(true);
-      setPreviewKey((key) => key + 1);
       setHistory([]);
       setPrompt("");
+      setHasGeneratedApp(true);
       setStatus("success");
       setIsSelectAppOpen(false);
+
+      // give Vite a moment to detect/rebuild after hydration
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      // force iframe reload only after hydration route succeeds
+      setPreviewKey((key) => key + 1);
     } catch (error) {
       console.error("[handleSelectApp] failed:", error);
       setSelectAppError("Something went wrong while loading the app.");
@@ -587,8 +591,8 @@ export default function AdminHomePage() {
           </div>
 
           <div className="shrink-0 border-b border-white/10 bg-slate-950/60 px-4 py-4">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3 shadow-lg shadow-black/20">
-              <div className="mb-4 grid grid-cols-2 gap-1 rounded-xl border border-white/10 bg-black/30 p-1">
+            <div className="rounded-lg border border-white/10 bg-white/[0.045] p-3 shadow-lg shadow-black/20">
+              <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/30 p-1">
                 <button
                   type="button"
                   className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
@@ -613,7 +617,7 @@ export default function AdminHomePage() {
               </div>
 
               {user && (
-                <div className="mb-4 rounded-xl border border-white/10 bg-black/20 px-3 py-3">
+                <div className="mb-4 rounded-lg border border-white/10 bg-black/20 px-3 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Role
@@ -628,7 +632,7 @@ export default function AdminHomePage() {
               )}
 
               <div className="space-y-2">
-                <div className="rounded-xl border border-white/10 bg-slate-950/45 p-3">
+                <div className="rounded-lg border border-white/10 bg-slate-950/45 p-3">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Organization
@@ -661,7 +665,7 @@ export default function AdminHomePage() {
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-slate-950/45 p-3">
+                <div className="rounded-lg border border-white/10 bg-slate-950/45 p-3">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       App
@@ -808,23 +812,23 @@ export default function AdminHomePage() {
                       </p>
                     ))}
                   </div>
-
-                  {user && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSaveAppError(null);
-                        setIsSaveAppOpen(true);
-                      }}
-                      className="mt-3 h-10 w-full rounded-xl bg-cyan-300 px-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
-                    >
-                      {currentAppId ? "Save new version" : "Save app"}
-                    </button>
-                  )}
                 </div>
               )}
             </div>
           </div>
+
+          {user && (
+            <button
+              type="button"
+              onClick={() => {
+                setSaveAppError(null);
+                setIsSaveAppOpen(true);
+              }}
+              className="mx-auto mt-3 block h-24 w-full rounded-lg bg-cyan-300 px-8 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
+            >
+              {currentAppId ? "Save new version" : "Save app"}
+            </button>
+          )}
 
           <div className="shrink-0 border-t border-white/10 bg-slate-950/95 px-4 py-4 shadow-[0_-24px_50px_rgba(0,0,0,0.32)]">
             <div className="rounded-lg border border-white/10 bg-white/[0.055] p-3 shadow-2xl shadow-black/30">
@@ -1260,12 +1264,18 @@ export default function AdminHomePage() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl">
-              <iframe
-                key={previewKey}
-                src={`http://localhost:5173?reset=${previewKey}`}
-                className="h-full w-full border-0"
-                title="Generated App Preview"
-              />
+              {isLoadingSelectedApp ? (
+                <div className="flex h-full items-center justify-center bg-slate-950 text-sm text-slate-400">
+                  Loading app preview...
+                </div>
+              ) : (
+                <iframe
+                  key={previewKey}
+                  src={`http://localhost:5173?preview=${previewKey}`}
+                  className="h-full w-full border-0"
+                  title="Generated App Preview"
+                />
+              )}
             </div>
           </div>
         </section>

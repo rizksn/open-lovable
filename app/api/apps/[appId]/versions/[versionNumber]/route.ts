@@ -1,29 +1,31 @@
-import fs from "fs/promises";
-import path from "path";
+/**
+ * Specific app version load route.
+ *
+ * GET /api/apps/[appId]/versions/[versionNumber]
+ * Loads a selected saved version of an app into the live builder workspace.
+ *
+ * Flow:
+ * 1. Parse and validate the requested version number.
+ * 2. Authenticate the current Supabase user.
+ * 3. Load the user's profile and role.
+ * 4. Load the target app metadata.
+ * 5. Verify the user can access this app.
+ * 6. Load the requested `app_versions` row.
+ * 7. Download that version's saved source files from Supabase Storage.
+ * 8. Hydrate those files into `generated-app/` for preview/editing.
+ *
+ * Important design note:
+ * Loading an older version does not publish or overwrite app history.
+ * It only restores that source snapshot into the temporary builder workspace.
+ *
+ * Future hardening:
+ * add audit logging for version loads and ensure role permissions distinguish
+ * viewers, editors, and admins.
+ */
+
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-async function copyDirectoryContents(
-  sourcePath: string,
-  destinationPath: string,
-) {
-  const entries = await fs.readdir(sourcePath, { withFileTypes: true });
-
-  await Promise.all(
-    entries
-      .filter((entry) => entry.name !== "node_modules")
-      .map((entry) =>
-        fs.cp(
-          path.join(sourcePath, entry.name),
-          path.join(destinationPath, entry.name),
-          {
-            recursive: true,
-            force: true,
-          },
-        ),
-      ),
-  );
-}
+import { hydrateGeneratedAppFromSupabaseVersion } from "@/lib/apps/storage";
 
 export async function GET(
   _request: Request,
@@ -113,38 +115,10 @@ export async function GET(
       );
     }
 
-    const versionPath = path.join(
-      process.cwd(),
-      "storage",
-      "apps",
-      version.storage_path,
-    );
-
-    try {
-      await fs.access(versionPath);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Saved version files not found" },
-        { status: 404 },
-      );
-    }
-
-    const generatedAppPath = path.join(process.cwd(), "generated-app");
-
-    const entries = await fs.readdir(generatedAppPath, { withFileTypes: true });
-
-    await Promise.all(
-      entries
-        .filter((entry) => entry.name !== "node_modules")
-        .map((entry) =>
-          fs.rm(path.join(generatedAppPath, entry.name), {
-            recursive: true,
-            force: true,
-          }),
-        ),
-    );
-
-    await copyDirectoryContents(versionPath, generatedAppPath);
+    await hydrateGeneratedAppFromSupabaseVersion({
+      supabase: supabaseServer,
+      storagePath: version.storage_path,
+    });
 
     return NextResponse.json({
       success: true,

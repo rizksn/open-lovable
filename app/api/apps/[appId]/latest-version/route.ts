@@ -1,60 +1,29 @@
-import fs from "fs/promises";
-import path from "path";
+/**
+ * Latest app version route.
+ *
+ * GET /api/apps/[appId]/latest-version
+ * Loads the newest saved version of an app into the live builder workspace.
+ *
+ * Flow:
+ * 1. Authenticate the current Supabase user.
+ * 2. Load the target app metadata.
+ * 3. Find the highest `version_number` for that app.
+ * 4. Read the version's `storage_path`.
+ * 5. Download the saved source files from Supabase Storage.
+ * 6. Hydrate those files into `generated-app/` for live preview/editing.
+ * 7. Return app/version metadata and the list of hydrated files.
+ *
+ * Important design note:
+ * This route does not publish the app.
+ * It only restores saved source code into the temporary builder workspace.
+ *
+ * Future hardening:
+ * add organization/role access checks before hydrating tenant-owned app files.
+ */
+
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-type LoadedFile = {
-  path: string;
-};
-
-async function readFilesRecursively(
-  directoryPath: string,
-  basePath = directoryPath,
-): Promise<LoadedFile[]> {
-  const entries = await fs.readdir(directoryPath, { withFileTypes: true });
-
-  const files = await Promise.all(
-    entries.map(async (entry) => {
-      if (entry.name === "node_modules") {
-        return [];
-      }
-
-      const fullPath = path.join(directoryPath, entry.name);
-
-      if (entry.isDirectory()) {
-        return readFilesRecursively(fullPath, basePath);
-      }
-
-      const relativePath = path.relative(basePath, fullPath);
-
-      return [{ path: relativePath }];
-    }),
-  );
-
-  return files.flat();
-}
-
-async function copyDirectoryContents(
-  sourcePath: string,
-  destinationPath: string,
-) {
-  const entries = await fs.readdir(sourcePath, { withFileTypes: true });
-
-  await Promise.all(
-    entries
-      .filter((entry) => entry.name !== "node_modules")
-      .map((entry) =>
-        fs.cp(
-          path.join(sourcePath, entry.name),
-          path.join(destinationPath, entry.name),
-          {
-            recursive: true,
-            force: true,
-          },
-        ),
-      ),
-  );
-}
+import { hydrateGeneratedAppFromSupabaseVersion } from "@/lib/apps/storage";
 
 export async function GET(
   _request: Request,
@@ -111,43 +80,12 @@ export async function GET(
       );
     }
 
-    const versionPath = path.join(
-      process.cwd(),
-      "storage",
-      "apps",
-      latestVersion.storage_path,
-    );
-
     console.log("[latest-version] storage_path:", latestVersion.storage_path);
-    console.log("[latest-version] versionPath:", versionPath);
 
-    try {
-      await fs.access(versionPath);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: "Saved app files not found" },
-        { status: 404 },
-      );
-    }
-
-    const generatedAppPath = path.join(process.cwd(), "generated-app");
-
-    const entries = await fs.readdir(generatedAppPath, { withFileTypes: true });
-
-    await Promise.all(
-      entries
-        .filter((entry) => entry.name !== "node_modules")
-        .map((entry) =>
-          fs.rm(path.join(generatedAppPath, entry.name), {
-            recursive: true,
-            force: true,
-          }),
-        ),
-    );
-
-    await copyDirectoryContents(versionPath, generatedAppPath);
-
-    const files = await readFilesRecursively(versionPath);
+    const files = await hydrateGeneratedAppFromSupabaseVersion({
+      supabase,
+      storagePath: latestVersion.storage_path,
+    });
 
     return NextResponse.json({
       success: true,

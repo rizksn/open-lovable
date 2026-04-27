@@ -1,6 +1,35 @@
+/**
+ * App versions collection route.
+ *
+ * POST /api/apps/[appId]/versions
+ * Saves the current builder workspace as a new immutable version of an
+ * existing app.
+ *
+ * Flow:
+ * 1. Validate the request payload.
+ * 2. Authenticate the current Supabase user.
+ * 3. Load the user's profile and role.
+ * 4. Load the target app metadata.
+ * 5. Verify the user can save versions for this app.
+ * 6. Find the latest version number for the app.
+ * 7. Upload the current `generated-app/` source files to Supabase Storage.
+ * 8. Insert a new `app_versions` row pointing to that saved source snapshot.
+ *
+ * GET /api/apps/[appId]/versions
+ * Lists all saved versions for an app, newest first.
+ *
+ * Important design note:
+ * Versions are append-only source snapshots. Saving a new version does not
+ * publish it or mutate older versions.
+ *
+ * Future hardening:
+ * distinguish editor/admin permissions, add version labels or notes, and
+ * consider optimistic locking if multiple users edit the same app.
+ */
+
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { copyGeneratedAppToLocalVersion } from "@/lib/apps/storage";
+import { uploadGeneratedAppToSupabaseVersion } from "@/lib/apps/storage";
 
 type CreateAppVersionRequest = {
   prompt: string;
@@ -101,7 +130,8 @@ export async function POST(
 
     const nextVersionNumber = (latestVersion?.version_number ?? 0) + 1;
 
-    const storagePath = await copyGeneratedAppToLocalVersion({
+    const storagePath = await uploadGeneratedAppToSupabaseVersion({
+      supabase: supabaseServer,
       organizationId: app.organization_id,
       appSlug: app.slug,
       versionNumber: nextVersionNumber,

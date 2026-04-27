@@ -1,7 +1,30 @@
-import fs from "fs/promises";
-import path from "path";
+/**
+ * App detail route.
+ *
+ * DELETE /api/apps/[appId]
+ * Deletes an app, its saved versions, and its associated source files.
+ *
+ * Flow:
+ * 1. Authenticate the current Supabase user.
+ * 2. Load the requesting user's profile and role.
+ * 3. Load the target app metadata.
+ * 4. Verify the user can delete this app.
+ * 5. Delete the app's saved source files from Supabase Storage.
+ * 6. Delete all `app_versions` rows for the app.
+ * 7. Delete the app row from `apps`.
+ *
+ * Important design note:
+ * Storage is deleted before database rows so failures do not leave orphaned
+ * source files without an app record pointing to them.
+ *
+ * Future hardening:
+ * restrict destructive deletes to platform admins and/or organization admins,
+ * and consider soft deletes for auditability.
+ */
+
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { deleteSupabaseAppStorage } from "@/lib/apps/storage";
 
 export async function DELETE(
   _request: Request,
@@ -60,6 +83,12 @@ export async function DELETE(
       );
     }
 
+    await deleteSupabaseAppStorage({
+      supabase: supabaseServer,
+      organizationId: app.organization_id,
+      appSlug: app.slug,
+    });
+
     const { error: versionsError } = await supabaseServer
       .from("app_versions")
       .delete()
@@ -82,27 +111,6 @@ export async function DELETE(
         { success: false, error: deleteAppError.message },
         { status: 500 },
       );
-    }
-
-    const organizationStoragePath = path.join(
-      process.cwd(),
-      "storage",
-      "apps",
-      app.organization_id,
-    );
-
-    const appStoragePath = path.join(organizationStoragePath, app.slug);
-
-    await fs.rm(appStoragePath, { recursive: true, force: true });
-
-    try {
-      const remainingEntries = await fs.readdir(organizationStoragePath);
-
-      if (remainingEntries.length === 0) {
-        await fs.rmdir(organizationStoragePath);
-      }
-    } catch {
-      // Organization folder may not exist or may already be removed.
     }
 
     return NextResponse.json({

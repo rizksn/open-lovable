@@ -99,6 +99,11 @@ export default function AdminHomePage() {
     null,
   );
 
+  /* Delete app modal state */
+  const [isDeleteAppOpen, setIsDeleteAppOpen] = useState(false);
+  const [isDeletingApp, setIsDeletingApp] = useState(false);
+  const [deleteAppError, setDeleteAppError] = useState<string | null>(null);
+
   const mode = hasGeneratedApp ? "edit" : "create";
 
   /**
@@ -427,6 +432,56 @@ export default function AdminHomePage() {
     }
   }
 
+  async function handleDeleteApp() {
+    if (!currentAppId) return;
+
+    setIsDeletingApp(true);
+    setDeleteAppError(null);
+
+    try {
+      const res = await fetch(`/api/apps/${currentAppId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        setDeleteAppError(data.error ?? "Failed to delete app.");
+        return;
+      }
+
+      const resetRes = await fetch("/api/outrival-reset", {
+        method: "POST",
+      });
+
+      const resetData = await resetRes.json();
+
+      if (!resetData.success) {
+        setDeleteAppError(
+          resetData.error ?? "App deleted, but preview reset failed.",
+        );
+        return;
+      }
+
+      setCurrentAppId(null);
+      setCurrentAppSlug(null);
+      setCurrentAppName(null);
+      setHasGeneratedApp(false);
+      setHistory([]);
+      setLastFilesWritten([]);
+      setLatestPrompt("");
+      setVersions([]);
+      setIsDeleteAppOpen(false);
+      setPreviewKey((key) => key + 1);
+
+      if (selectedOrganization) {
+        await fetchAppsForSelectedOrganization();
+      }
+    } finally {
+      setIsDeletingApp(false);
+    }
+  }
+
   /**
    * Loads apps for the currently selected organization
    * and opens the app selector modal.
@@ -632,6 +687,19 @@ export default function AdminHomePage() {
                       className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 text-xs font-bold text-slate-300 transition hover:border-cyan-300/25 hover:bg-cyan-300/10 hover:text-cyan-100"
                     >
                       Version History
+                    </button>
+                  )}
+
+                  {currentAppId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteAppError(null);
+                        setIsDeleteAppOpen(true);
+                      }}
+                      className="mt-2 h-9 w-full rounded-lg border border-red-400/20 bg-red-400/10 px-3 text-xs font-bold text-red-200 transition hover:border-red-300/30 hover:bg-red-400/15"
+                    >
+                      Delete App
                     </button>
                   )}
                 </div>
@@ -1114,6 +1182,50 @@ export default function AdminHomePage() {
           </div>
         )}
 
+        {/* Delete App confirmation modal */}
+        {isDeleteAppOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-3xl border border-red-400/20 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
+              <h2 className="text-xl font-bold tracking-tight">Delete app?</h2>
+
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                This will permanently delete{" "}
+                <span className="font-semibold text-slate-200">
+                  {currentAppName ?? "this app"}
+                </span>{" "}
+                and all saved versions. This cannot be undone.
+              </p>
+
+              {deleteAppError && (
+                <p className="mt-3 text-sm font-medium text-red-300">
+                  {deleteAppError}
+                </p>
+              )}
+
+              <div className="mt-6 grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteAppError(null);
+                    setIsDeleteAppOpen(false);
+                  }}
+                  className="h-11 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteApp}
+                  disabled={isDeletingApp}
+                  className="h-11 rounded-xl bg-red-400 px-4 text-sm font-bold text-white transition hover:bg-red-300 disabled:opacity-50"
+                >
+                  {isDeletingApp ? "Deleting..." : "Delete app"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         <section className="min-w-0 flex-1 overflow-hidden p-5">
           <div className="flex h-full flex-col overflow-hidden rounded-[10px] border border-white/10 bg-slate-900/60 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl">
             <div className="mb-3 flex shrink-0 items-center justify-between px-1">
@@ -1137,7 +1249,7 @@ export default function AdminHomePage() {
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-white/10 bg-white shadow-2xl">
               <iframe
                 key={previewKey}
-                src="http://localhost:5173"
+                src={`http://localhost:5173?reset=${previewKey}`}
                 className="h-full w-full border-0"
                 title="Generated App Preview"
               />

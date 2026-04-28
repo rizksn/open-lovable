@@ -708,53 +708,57 @@ export default function AdminHomePage() {
                     </button>
                   </div>
 
-                  <p className="truncate text-sm font-semibold text-white">
+                  <p className="truncate text-sm font-semibold pb-4 text-white">
                     {currentAppName ?? "New app"}
                   </p>
 
-                  {currentAppId && (
-                    <button
-                      type="button"
-                      onClick={handleOpenVersionHistory}
-                      className="mt-3 h-9 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 text-xs font-bold text-slate-300 transition hover:border-cyan-300/25 hover:bg-cyan-300/10 hover:text-cyan-100"
-                    >
-                      Version History
-                    </button>
-                  )}
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    {currentAppId && (
+                      <button
+                        type="button"
+                        onClick={handleOpenVersionHistory}
+                        className="h-24 w-full rounded-lg border border-white/10 bg-white/[0.06] pl-12 text-xs font-bold text-slate-300 transition hover:border-cyan-300/25 hover:bg-cyan-300/10 hover:text-cyan-100"
+                      >
+                        Version History
+                      </button>
+                    )}
 
-                  {selectedOrganization && currentAppId && hasGeneratedApp && (
-                    <button
-                      type="button"
-                      onClick={handlePublishApp}
-                      disabled={status === "validating"}
-                      className="h-20 rounded-lg w-full border border-emerald-400/30 bg-emerald-400/10 px-3 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      Publish
-                    </button>
-                  )}
+                    {selectedOrganization &&
+                      currentAppId &&
+                      hasGeneratedApp && (
+                        <button
+                          type="button"
+                          onClick={handlePublishApp}
+                          disabled={status === "validating"}
+                          className="h-24 w-full rounded-lg border border-emerald-400/30 bg-emerald-400/10 pl-12 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-400/15 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Publish
+                        </button>
+                      )}
+
+                    {currentAppId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteAppError(null);
+                          setIsDeleteAppOpen(true);
+                        }}
+                        className="h-24 w-full rounded-lg border border-red-400/20 bg-red-400/10 pl-12 text-xs font-bold text-red-200 transition hover:border-red-300/30 hover:bg-red-400/15"
+                      >
+                        Delete App
+                      </button>
+                    )}
+                  </div>
 
                   {currentAppSlug && (
                     <a
                       href={`/apps/${currentAppSlug}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg w-full border h-20 border-cyan-300/25 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
+                      className="mt-10 flex h-24 w-full items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
                     >
                       Open public app
                     </a>
-                  )}
-
-                  {currentAppId && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDeleteAppError(null);
-                        setIsDeleteAppOpen(true);
-                      }}
-                      className="mt-2 h-20 w-full rounded-lg border border-red-400/20 bg-red-400/10 px-3 text-xs font-bold text-red-200 transition hover:border-red-300/30 hover:bg-red-400/15"
-                    >
-                      Delete App
-                    </button>
                   )}
                 </div>
               </div>
@@ -862,7 +866,7 @@ export default function AdminHomePage() {
                 setSaveAppError(null);
                 setIsSaveAppOpen(true);
               }}
-              className="mx-auto mt-3 block h-24 w-full rounded-lg bg-cyan-300 px-8 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
+              className="ml-6 mt-3 block h-24 w-full rounded-lg bg-cyan-300 pl-20 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
             >
               {currentAppId ? "Save new version" : "Save app"}
             </button>
@@ -1001,13 +1005,13 @@ export default function AdminHomePage() {
 
         {/* Select Organization modal */}
         {isSelectOrgOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
-              <h2 className="text-xl font-bold tracking-tight">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 m-80 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-lg border border-white/10 bg-slate-950 p-20 text-white shadow-2xl shadow-black/60">
+              <h2 className="text-xl pb-10 font-bold tracking-tight">
                 Select Organization
               </h2>
 
-              <div className="mt-5 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+              <div className="mt-5 max-h-[360px] space-y-8 overflow-y-auto pr-1">
                 {isLoadingOrganizations ? (
                   <p className="text-sm text-slate-500">
                     Loading organizations...
@@ -1029,7 +1033,7 @@ export default function AdminHomePage() {
                         setApps([]);
                         setIsSelectOrgOpen(false);
                       }}
-                      className="w-full rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3.5 text-left transition hover:border-cyan-300/25 hover:bg-cyan-300/10"
+                      className="w-full rounded-lg border border-white/10 bg-white/[0.05] px-16 py-3.5 text-left transition hover:border-cyan-300/25 hover:bg-cyan-300/10"
                     >
                       <p className="text-sm font-bold text-white">
                         {organization.name}
@@ -1045,7 +1049,7 @@ export default function AdminHomePage() {
               <button
                 type="button"
                 onClick={() => setIsSelectOrgOpen(false)}
-                className="mt-6 h-11 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+                className="mt-20 h-28 w-full rounded-xl border border-white/10 bg-yellow-500/50 px-16 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
               >
                 Cancel
               </button>
@@ -1114,8 +1118,8 @@ export default function AdminHomePage() {
 
         {/* Select App modal */}
         {isSelectAppOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 m-80 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-lg border border-white/10 bg-slate-950 p-20 text-white shadow-2xl shadow-black/60">
               <h2 className="text-xl font-bold tracking-tight">Select App</h2>
 
               <p className="mt-2 text-sm text-slate-500">
@@ -1152,7 +1156,7 @@ export default function AdminHomePage() {
               <button
                 type="button"
                 onClick={() => setIsSelectAppOpen(false)}
-                className="mt-6 h-11 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+                className="mt-20 h-28 w-full rounded-xl border border-white/10 bg-yellow-500/50 px-16 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
               >
                 Cancel
               </button>
@@ -1162,8 +1166,8 @@ export default function AdminHomePage() {
 
         {/* Version History modal */}
         {isVersionHistoryOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 m-80 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-26 text-white shadow-2xl shadow-black/60">
               <h2 className="text-xl font-bold tracking-tight">
                 Version History
               </h2>
@@ -1178,7 +1182,7 @@ export default function AdminHomePage() {
                 </p>
               )}
 
-              <div className="mt-5 max-h-[360px] space-y-2 overflow-y-auto pr-1">
+              <div className="mt-20 max-h-[360px] space-y-2 overflow-y-auto pr-1">
                 {isLoadingVersions ? (
                   <p className="text-sm text-slate-500">Loading versions...</p>
                 ) : versions.length === 0 ? (
@@ -1187,11 +1191,11 @@ export default function AdminHomePage() {
                   versions.map((version, index) => (
                     <div
                       key={version.id}
-                      className="rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3.5"
+                      className="rounded-lg border border-white/10 bg-white/[0.05] mb-10 px-4 py-3.5"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-bold text-white">
+                          <p className="pb-10 text-sm font-bold text-white">
                             v{version.versionNumber}{" "}
                             {index === 0 && (
                               <span className="text-xs font-semibold text-cyan-300">
@@ -1215,7 +1219,7 @@ export default function AdminHomePage() {
                             handleLoadVersion(version.versionNumber)
                           }
                           disabled={isLoadingSelectedVersion}
-                          className="h-8 shrink-0 rounded-lg bg-cyan-300 px-3 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
+                          className="h-20 rounded-lg bg-cyan-300 px-20 mr-10 text-xs font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
                         >
                           Load
                         </button>
@@ -1228,7 +1232,7 @@ export default function AdminHomePage() {
               <button
                 type="button"
                 onClick={() => setIsVersionHistoryOpen(false)}
-                className="mt-6 h-11 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+                className="mt-20 h-28 w-full rounded-xl border border-white/10 bg-yellow-500/50 px-16 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
               >
                 Cancel
               </button>
@@ -1238,8 +1242,8 @@ export default function AdminHomePage() {
 
         {/* Delete App confirmation modal */}
         {isDeleteAppOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
-            <div className="w-full max-w-md rounded-3xl border border-red-400/20 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 m-80 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-lg border border-red-400/20 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
               <h2 className="text-xl font-bold tracking-tight">Delete app?</h2>
 
               <p className="mt-2 text-sm leading-relaxed text-slate-500">

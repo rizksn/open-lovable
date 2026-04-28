@@ -757,7 +757,7 @@ export default function AdminHomePage() {
                       rel="noreferrer"
                       className="mt-10 flex h-24 w-full items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"
                     >
-                      Open public app
+                      Launch Application
                     </a>
                   )}
                 </div>
@@ -950,9 +950,9 @@ export default function AdminHomePage() {
 
         {/* Create Organization modal */}
         {isCreateOrgOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
-            <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
-              <h2 className="text-xl font-bold tracking-tight">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 m-80 backdrop-blur-md">
+            <div className="w-full max-w-md rounded-lg border border-white/10 bg-slate-950 p-30 text-white shadow-2xl shadow-black/60">
+              <h2 className="text-xl mb-18 font-bold tracking-tight">
                 Create Organization
               </h2>
 
@@ -960,14 +960,14 @@ export default function AdminHomePage() {
                 value={organizationName}
                 onChange={(e) => setOrganizationName(e.target.value)}
                 placeholder="Organization name"
-                className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
+                className="mt-5 mb-8 h-38 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
               />
 
               <input
                 value={organizationSlug}
                 onChange={(e) => setOrganizationSlug(e.target.value)}
                 placeholder="Slug (e.g. umich)"
-                className="mt-3 h-11 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
+                className="mt-3 mb-20 h-38 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
               />
 
               {organizationError && (
@@ -985,7 +985,7 @@ export default function AdminHomePage() {
                     setOrganizationError(null);
                     setIsCreateOrgOpen(false);
                   }}
-                  className="h-11 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+                  className="h-28 rounded-lg border border-white/10 bg-white/[0.06] px-20 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
                 >
                   Cancel
                 </button>
@@ -994,7 +994,7 @@ export default function AdminHomePage() {
                   type="button"
                   onClick={handleCreateOrganization}
                   disabled={isCreatingOrganization}
-                  className="h-11 rounded-xl bg-cyan-300 px-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
+                  className="h-28 rounded-lg bg-cyan-300 px-20 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
                 >
                   {isCreatingOrganization ? "Creating..." : "Create"}
                 </button>
@@ -1195,7 +1195,7 @@ export default function AdminHomePage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="pb-10 text-sm font-bold text-white">
+                          <p className="pb-10 pl-10 text-sm font-bold text-white">
                             v{version.versionNumber}{" "}
                             {index === 0 && (
                               <span className="text-xs font-semibold text-cyan-300">
@@ -1204,11 +1204,11 @@ export default function AdminHomePage() {
                             )}
                           </p>
 
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                          <p className="mt-1 ml-10 line-clamp-2 text-xs text-slate-500">
                             {version.prompt}
                           </p>
 
-                          <p className="mt-2 text-[11px] font-medium text-slate-600">
+                          <p className="mt-2 ml-10 text-[11px] font-medium text-slate-600">
                             {new Date(version.createdAt).toLocaleString()}
                           </p>
                         </div>
@@ -1243,15 +1243,17 @@ export default function AdminHomePage() {
         {/* Delete App confirmation modal */}
         {isDeleteAppOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 m-80 backdrop-blur-md">
-            <div className="w-full max-w-md rounded-lg border border-red-400/20 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
-              <h2 className="text-xl font-bold tracking-tight">Delete app?</h2>
+            <div className="w-full max-w-md rounded-lg border border-red-400/20 bg-slate-950 p-30 text-white shadow-2xl shadow-black/60">
+              <h2 className="text-xl font-bold tracking-tight mb-10">
+                Delete app?
+              </h2>
 
-              <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              <p className="mt-2 text-m leading-relaxed text-slate-500">
                 This will permanently delete{" "}
                 <span className="font-semibold text-slate-200">
                   {currentAppName ?? "this app"}
                 </span>{" "}
-                and all saved versions. This cannot be undone.
+                and all saved versions. This action cannot be undone.
               </p>
 
               {deleteAppError && (
@@ -1260,14 +1262,14 @@ export default function AdminHomePage() {
                 </p>
               )}
 
-              <div className="mt-6 grid grid-cols-2 gap-2.5">
+              <div className="mt-30 grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
                     setDeleteAppError(null);
                     setIsDeleteAppOpen(false);
                   }}
-                  className="h-11 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+                  className="h-28 rounded-xl border border-white/10 bg-white/[0.06] px-20 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
                 >
                   Cancel
                 </button>
@@ -1276,7 +1278,7 @@ export default function AdminHomePage() {
                   type="button"
                   onClick={handleDeleteApp}
                   disabled={isDeletingApp}
-                  className="h-11 rounded-xl bg-red-400 px-4 text-sm font-bold text-white transition hover:bg-red-300 disabled:opacity-50"
+                  className="h-28 rounded-lg bg-red-400 px-20 text-sm font-bold text-white transition hover:bg-red-300 disabled:opacity-50"
                 >
                   {isDeletingApp ? "Deleting..." : "Delete app"}
                 </button>

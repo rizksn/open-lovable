@@ -105,6 +105,15 @@ function generatedAppRoot() {
 }
 
 /**
+ * Temporary local checkpoint used only during generation.
+ * Supabase remains the durable source of truth; this protects the live
+ * generated-app workspace from failed candidate edits.
+ */
+function generatedAppBackupRoot() {
+  return path.join(process.cwd(), ".outrival-backups", "generated-app-src");
+}
+
+/**
  * Resolves generated file paths defensively before writing to disk.
  * This prevents path traversal from escaping generated-app, even if the model
  * returns something malicious or malformed like ../../app/api/route.ts.
@@ -143,6 +152,20 @@ function isWritableGeneratedFile(filePath: string) {
   if (!normalizedPath.startsWith("src/")) return false;
   if (normalizedPath === "src/main.jsx") return false;
   if (normalizedPath.includes("../")) return false;
+
+  const blockedSegments = [
+    "node_modules",
+    "dist",
+    ".git",
+    ".env",
+    "package.json",
+    "vite.config",
+    "index.html",
+  ];
+
+  if (blockedSegments.some((segment) => normalizedPath.includes(segment))) {
+    return false;
+  }
 
   return (
     normalizedPath.endsWith(".jsx") ||
@@ -186,9 +209,11 @@ async function validateGeneratedApp() {
 }
 
 /**
- * Captures the current generated app source before applying a new generation.
- * This snapshot lets us rollback cleanly if the model returns code that fails
- * validation.
+ * Recursively walks generated-app/src and stores current source files as
+ * AI edit context.
+ *
+ * This is not the rollback snapshot. Rollback uses snapshotGeneratedSrc()
+ * so the full working src folder can be restored exactly.
  */
 async function readCurrentGeneratedFiles() {
   const root = generatedAppRoot();
@@ -202,9 +227,8 @@ async function readCurrentGeneratedFiles() {
   }
 
   /**
-   * Recursively walks generated-app/src and stores only the file types this
-   * route is allowed to overwrite. That keeps rollback scoped to the same
-   * controlled surface area as generation.
+   * Recursively walks generated-app/src and stores current text source files
+   * as context for the generator.
    */
   async function walk(dir: string) {
     const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -217,8 +241,6 @@ async function readCurrentGeneratedFiles() {
         continue;
       }
 
-      if (!entry.name.match(/\.(jsx?|css)$/)) continue;
-
       const relativePath = path.relative(root, absolutePath);
       currentFiles[relativePath] = await fs.readFile(absolutePath, "utf8");
     }
@@ -229,21 +251,62 @@ async function readCurrentGeneratedFiles() {
 }
 
 /**
+ * Copies the full generated-app/src folder before applying candidate AI writes.
+ * This preserves the exact current working app, including successful unsaved
+ * edits, so failed generations can rollback locally without re-fetching from
+ * Supabase.
+ */
+async function snapshotGeneratedSrc() {
+  const srcRoot = path.join(generatedAppRoot(), "src");
+  const backupRoot = generatedAppBackupRoot();
+
+  await fs.rm(backupRoot, { recursive: true, force: true });
+
+  try {
+    await fs.access(srcRoot);
+  } catch {
+    return false;
+  }
+
+  await fs.mkdir(path.dirname(backupRoot), { recursive: true });
+  await fs.cp(srcRoot, backupRoot, { recursive: true });
+
+  return true;
+}
+
+/**
  * Restores the previous generated app state after a failed validation.
  * This gives the route transactional behavior: a bad generation does not leave
  * the preview app in a broken or partially-written state.
  */
-async function restoreGeneratedFiles(previousFiles: Record<string, string>) {
-  const root = generatedAppRoot();
-  const srcRoot = path.join(root, "src");
+async function restoreGeneratedSrcFromSnapshot(hasSnapshot: boolean) {
+  const srcRoot = path.join(generatedAppRoot(), "src");
+  const backupRoot = generatedAppBackupRoot();
 
   await fs.rm(srcRoot, { recursive: true, force: true });
 
-  for (const [relativePath, content] of Object.entries(previousFiles)) {
-    const targetPath = safeGeneratedAppPath(relativePath);
-    await fs.mkdir(path.dirname(targetPath), { recursive: true });
-    await fs.writeFile(targetPath, content, "utf8");
+  if (!hasSnapshot) {
+    await fs.mkdir(srcRoot, { recursive: true });
+    return;
   }
+
+  await fs.cp(backupRoot, srcRoot, { recursive: true });
+}
+
+async function ensureViteRelativeBase() {
+  const viteConfigPath = path.join(generatedAppRoot(), "vite.config.js");
+
+  const viteConfig = `import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+
+export default defineConfig({
+  base: "./",
+  plugins: [react(), tailwindcss()],
+});
+  `;
+
+  await fs.writeFile(viteConfigPath, viteConfig, "utf8");
 }
 
 /**
@@ -268,6 +331,7 @@ export async function POST(request: Request) {
     );
   }
 
+  const hasSnapshot = await snapshotGeneratedSrc();
   const currentFiles = await readCurrentGeneratedFiles();
 
   console.log("[outrival-generate]", {
@@ -450,6 +514,8 @@ Important constraints:
     await fs.writeFile(targetPath, content, "utf8");
   }
 
+  await ensureViteRelativeBase();
+
   const validation = await validateGeneratedApp();
 
   /**
@@ -463,7 +529,7 @@ Important constraints:
       filesWritten: writableFiles.map((file) => file.path),
     });
 
-    await restoreGeneratedFiles(currentFiles);
+    await restoreGeneratedSrcFromSnapshot(hasSnapshot);
 
     return NextResponse.json(
       {

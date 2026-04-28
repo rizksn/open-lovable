@@ -1,3 +1,27 @@
+/**
+ * POST /api/apps/[appId]/publish
+ *
+ * Publishes the latest saved version of an app to its public runtime location.
+ *
+ * This route does not publish the raw source files directly. Instead, it:
+ * 1. Authenticates the current Supabase user.
+ * 2. Verifies the user is allowed to publish the requested app.
+ * 3. Loads the latest saved app version from `app_versions`.
+ * 4. Downloads that version's source files from the private `apps` storage bucket.
+ * 5. Rebuilds the app in a temporary local directory.
+ * 6. Uploads the generated `dist` build output to the public `published-apps` bucket.
+ * 7. Updates the `apps` table with publish metadata:
+ *    - `is_published`
+ *    - `published_version_id`
+ *    - `published_at`
+ *
+ * Published files are written to:
+ * `{organizationId}/{appSlug}/dist`
+ *
+ * The public app route should load from this published build output, not from
+ * the editable source version.
+ */
+
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -11,6 +35,19 @@ const execFileAsync = promisify(execFile);
 type RouteParams = {
   params: Promise<{ appId: string }>;
 };
+
+function getContentType(filePath: string) {
+  if (filePath.endsWith(".html")) return "text/html; charset=utf-8";
+  if (filePath.endsWith(".css")) return "text/css; charset=utf-8";
+  if (filePath.endsWith(".js")) return "application/javascript; charset=utf-8";
+  if (filePath.endsWith(".svg")) return "image/svg+xml";
+  if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
+  if (filePath.endsWith(".png")) return "image/png";
+  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg"))
+    return "image/jpeg";
+  if (filePath.endsWith(".webp")) return "image/webp";
+  return "application/octet-stream";
+}
 
 export async function POST(_request: Request, { params }: RouteParams) {
   try {
@@ -169,6 +206,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
             .from("published-apps")
             .upload(storageObjectPath, fileBuffer, {
               upsert: true,
+              contentType: getContentType(storageObjectPath),
             });
 
           if (uploadError) {
@@ -191,7 +229,25 @@ export async function POST(_request: Request, { params }: RouteParams) {
       // 2. Validate minimal app structure
       await fs.access(path.join(tempRoot, "package.json"));
       await fs.access(path.join(tempRoot, "index.html"));
-      await fs.access(path.join(tempRoot, "src", "main.jsx"));
+
+      const entryCandidates = ["main.jsx", "main.tsx", "main.js", "main.ts"];
+
+      const hasEntry = await Promise.any(
+        entryCandidates.map((file) =>
+          fs.access(path.join(tempRoot, "src", file)).then(() => true),
+        ),
+      ).catch(() => false);
+
+      if (!hasEntry) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Generated app is missing a valid Vite entry file in src/: main.jsx, main.tsx, main.js, or main.ts",
+          },
+          { status: 400 },
+        );
+      }
 
       // 3. Install deps
       await execFileAsync("npm", ["install"], { cwd: tempRoot });

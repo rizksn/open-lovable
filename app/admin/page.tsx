@@ -106,6 +106,9 @@ export default function AdminHomePage() {
 
   const mode = hasGeneratedApp ? "edit" : "create";
 
+  const PUBLIC_APP_BASE_URL =
+    process.env.NEXT_PUBLIC_APP_BASE_URL ?? "http://localhost:3000";
+
   /**
    * Loads all organizations the current admin can choose from.
    * Used to populate the organization selector.
@@ -372,13 +375,20 @@ export default function AdminHomePage() {
       setHistory([]);
       setPrompt("");
       setHasGeneratedApp(true);
+
+      const restartRes = await fetch("/api/restart-vite", {
+        method: "POST",
+      });
+
+      if (!restartRes.ok) {
+        console.warn("[handleSelectApp] Vite restart failed after hydration");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      setPreviewKey((key) => key + 1);
       setStatus("success");
       setIsSelectAppOpen(false);
-
-      // give Vite a moment to detect/rebuild after hydration
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      // force iframe reload only after hydration route succeeds
-      setPreviewKey((key) => key + 1);
     } catch (error) {
       console.error("[handleSelectApp] failed:", error);
       setSelectAppError("Something went wrong while loading the app.");
@@ -749,7 +759,7 @@ export default function AdminHomePage() {
 
                   {currentAppSlug && (
                     <a
-                      href={`/apps/${currentAppSlug}`}
+                      href={`${PUBLIC_APP_BASE_URL}/apps/${currentAppSlug}`}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-10 flex h-24 w-full items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"

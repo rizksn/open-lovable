@@ -594,7 +594,7 @@ export default function AdminHomePage() {
     <RequireRole allowedRoles={["platform_admin"]}>
       <main className="flex h-screen w-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.14),_transparent_34%),linear-gradient(135deg,_#020617_0%,_#050816_45%,_#020617_100%)] text-slate-100">
         <aside className="flex h-screen w-[430px] shrink-0 flex-col overflow-hidden border-r border-white/10 bg-slate-950/85 shadow-2xl shadow-black/50 backdrop-blur-xl">
-          <div className="shrink-0 border-b border-white/10 bg-white/[0.03] px-5 py-4">
+          <div className="shrink-0 border-b border-white/10 bg-white/[0.03] px-5 py-8">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-3">
@@ -602,13 +602,10 @@ export default function AdminHomePage() {
                     <div className="h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.9)]" />
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 ml-4">
                     <h1 className="truncate text-lg font-semibold tracking-tight text-white">
                       OutRival
                     </h1>
-                    <p className="mt-0.5 text-xs font-medium text-slate-400">
-                      AI application workspace
-                    </p>
                   </div>
                 </div>
               </div>
@@ -619,7 +616,7 @@ export default function AdminHomePage() {
 
           <div className="shrink-0 border-b border-white/10 bg-slate-950/60 px-4 py-4">
             <div className="rounded-lg border border-white/10 bg-white/[0.045] p-3 shadow-lg shadow-black/20">
-              <div className="mb-4 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/30 p-1">
+              <div className="mb-10 grid grid-cols-2 gap-1 rounded-lg border border-white/10 bg-black/30 p-1">
                 <button
                   type="button"
                   className={`min-h-11 rounded-lg px-3 py-2 text-sm font-bold transition ${
@@ -644,7 +641,7 @@ export default function AdminHomePage() {
               </div>
 
               {user && (
-                <div className="mb-4 rounded-lg border border-white/10 bg-black/20 px-3 py-3">
+                <div className="h-36 mb-4 rounded-lg border border-white/10 bg-black/20 px-3 py-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Role

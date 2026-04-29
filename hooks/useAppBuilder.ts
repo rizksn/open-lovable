@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import type { Dispatch, SetStateAction } from "react";
 import type { AuthUser } from "@/types/auth";
@@ -516,7 +516,7 @@ export function useAppBuilder({
     }
   }
 
-  function clearBuilderState() {
+  const clearBuilderState = useCallback(() => {
     setStatus("idle");
     setPrompt("");
     setHasGeneratedApp(false);
@@ -531,7 +531,7 @@ export function useAppBuilder({
     setIsSaveAppOpen(false);
     setAppName("");
     setSaveAppError(null);
-  }
+  }, []);
 
   /**
    * Manually resets the temporary generated-app workspace
@@ -540,7 +540,18 @@ export function useAppBuilder({
   async function handleReset() {
     await resetGeneratedApp();
 
+    const restartResult = await restartVitePreview();
+
+    if (!restartResult.ok) {
+      console.warn("[handleReset] Vite restart request failed");
+    } else {
+      console.log("[handleReset] restart result", restartResult.data);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     clearBuilderState();
+    setPreviewKey((key) => key + 1);
   }
 
   /**

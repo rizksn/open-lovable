@@ -15,3 +15,8 @@ export async function createOrganization(payload: {
 
   return res.json();
 }
+
+export async function getOrganizationById(organizationId: string) {
+  const res = await fetch(`/api/organizations/${organizationId}`);
+  return res.json();
+}

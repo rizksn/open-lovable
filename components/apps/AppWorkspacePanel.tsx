@@ -1,8 +1,9 @@
 import type { AppBuilderMode, AppWorkspacePermissions } from "@/types/app";
+import type { AppRole } from "@/types/auth";
 
 type AppWorkspacePanelProps = {
   mode: AppBuilderMode;
-  userRole?: "platform_admin" | "editor";
+  userRole?: AppRole;
   selectedOrganizationName?: string;
   hasSelectedOrganization: boolean;
   currentAppId: string | null;

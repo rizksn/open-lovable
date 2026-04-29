@@ -9,6 +9,9 @@
  * 2. Load the requesting user's profile and role.
  * 3. Load the target app metadata.
  * 4. Verify the user can delete this app.
+ *    - platform_admin can delete
+ *    - editor can delete within their own organization
+ *    - viewer cannot delete apps
  * 5. Delete the app's saved source files from Supabase Storage.
  * 6. Delete all `app_versions` rows for the app.
  * 7. Delete the app row from `apps`.
@@ -18,8 +21,8 @@
  * source files without an app record pointing to them.
  *
  * Future hardening:
- * restrict destructive deletes to platform admins and/or organization admins,
- * and consider soft deletes for auditability.
+ * consider soft deletes, delete audit logs, and richer destructive-action
+ * safeguards for production environments.
  */
 
 import { NextResponse } from "next/server";
@@ -73,10 +76,18 @@ export async function DELETE(
     }
 
     const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isEditor = userProfile.role === "editor";
     const isOwnOrganization =
       userProfile.organization_id === app.organization_id;
 
-    if (!isPlatformAdmin && !isOwnOrganization) {
+    if (userProfile.role === "viewer") {
+      return NextResponse.json(
+        { success: false, error: "Viewers cannot delete apps" },
+        { status: 403 },
+      );
+    }
+
+    if (!isPlatformAdmin && !(isEditor && isOwnOrganization)) {
       return NextResponse.json(
         { success: false, error: "Not allowed to delete this app" },
         { status: 403 },

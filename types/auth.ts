@@ -1,4 +1,4 @@
-export type AppRole = "platform_admin" | "editor";
+export type AppRole = "platform_admin" | "editor" | "viewer";
 
 export type AuthUser = {
   id: string;

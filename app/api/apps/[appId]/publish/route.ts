@@ -43,8 +43,9 @@ function getContentType(filePath: string) {
   if (filePath.endsWith(".svg")) return "image/svg+xml";
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
   if (filePath.endsWith(".png")) return "image/png";
-  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg"))
+  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
     return "image/jpeg";
+  }
   if (filePath.endsWith(".webp")) return "image/webp";
   return "application/octet-stream";
 }
@@ -55,7 +56,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     const supabase = await createSupabaseServerClient();
 
-    // --- AUTH ---
     const {
       data: { user },
       error: authError,
@@ -94,11 +94,22 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const canPublish =
-      currentUser.role === "platform_admin" ||
+    const isPlatformAdmin = currentUser.role === "platform_admin";
+    const isEditor = currentUser.role === "editor";
+    const isOwnOrganization =
       currentUser.organization_id === app.organization_id;
 
-    if (!canPublish) {
+    if (currentUser.role === "viewer") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Viewers cannot publish apps",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (!isPlatformAdmin && !(isEditor && isOwnOrganization)) {
       return NextResponse.json(
         {
           success: false,
@@ -108,7 +119,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // --- GET LATEST VERSION ---
     const { data: latestVersion, error: versionError } = await supabase
       .from("app_versions")
       .select("id, version_number, storage_path")
@@ -125,8 +135,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
     }
 
     const sourceBasePath = latestVersion.storage_path;
-
-    // 🔥 NOW WE PUBLISH DIST, NOT SOURCE
     const publishedBasePath = `${app.organization_id}/${app.slug}/dist`;
 
     const tempRoot = path.join(
@@ -135,7 +143,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       `${app.id}-${latestVersion.id}`,
     );
 
-    // --- DOWNLOAD SOURCE FROM SUPABASE ---
     async function downloadFolder(
       storageFolderPath: string,
       localFolderPath: string,
@@ -181,7 +188,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // --- UPLOAD DIST TO SUPABASE ---
     async function uploadFolder(
       localFolderPath: string,
       storageFolderPath: string,
@@ -218,15 +224,12 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    // --- MAIN FLOW ---
     try {
       await fs.rm(tempRoot, { recursive: true, force: true });
       await fs.mkdir(tempRoot, { recursive: true });
 
-      // 1. Download source
       await downloadFolder(sourceBasePath, tempRoot);
 
-      // 2. Validate minimal app structure
       await fs.access(path.join(tempRoot, "package.json"));
       await fs.access(path.join(tempRoot, "index.html"));
 
@@ -249,23 +252,17 @@ export async function POST(_request: Request, { params }: RouteParams) {
         );
       }
 
-      // 3. Install deps
       await execFileAsync("npm", ["install"], { cwd: tempRoot });
-
-      // 4. Build app
       await execFileAsync("npm", ["run", "build"], { cwd: tempRoot });
 
       const distRoot = path.join(tempRoot, "dist");
-
       await fs.access(path.join(distRoot, "index.html"));
 
-      // 5. Upload dist
       await uploadFolder(distRoot, publishedBasePath);
     } finally {
       await fs.rm(tempRoot, { recursive: true, force: true });
     }
 
-    // --- UPDATE DB ---
     const publishedAt = new Date().toISOString();
 
     const { error: updateError } = await supabase

@@ -28,8 +28,11 @@ export async function restartVitePreview() {
     method: "POST",
   });
 
+  const data = await res.json();
+
   return {
     ok: res.ok,
+    data,
   };
 }
 

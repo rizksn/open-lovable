@@ -90,10 +90,21 @@ export async function POST(request: Request) {
     }
 
     const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isEditor = userProfile.role === "editor";
     const isOwnOrganization =
       userProfile.organization_id === body.organizationId;
 
-    if (!isPlatformAdmin && !isOwnOrganization) {
+    if (userProfile.role === "viewer") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Viewers cannot save apps",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (!isPlatformAdmin && !(isEditor && isOwnOrganization)) {
       return NextResponse.json(
         {
           success: false,
@@ -188,6 +199,32 @@ export async function GET(request: Request) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 },
+      );
+    }
+
+    const { data: userProfile, error: userError } = await supabaseServer
+      .from("users")
+      .select("id, role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (userError || !userProfile) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user" },
+        { status: 401 },
+      );
+    }
+
+    const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isOwnOrganization = userProfile.organization_id === organizationId;
+
+    if (!isPlatformAdmin && !isOwnOrganization) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not allowed to view apps for this organization",
+        },
+        { status: 403 },
       );
     }
 

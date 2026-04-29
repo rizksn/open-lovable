@@ -8,13 +8,14 @@ type AuthContextValue = {
   user: AuthUser | null;
   loading: boolean;
   loginAsPlatformAdmin: () => Promise<void>;
-  loginAsInstitutionUser: () => Promise<void>;
+  loginAsInstitutionUser: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const DEV_PASSWORD = "password123";
+const PLATFORM_ADMIN_EMAIL = "admin@outrival.local";
 
 async function fetchUserProfile(userId: string): Promise<AuthUser | null> {
   const { data, error } = await supabase
@@ -110,11 +111,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function loginAsPlatformAdmin() {
-    await loginWithEmail("admin@outrival.local");
+    await loginWithEmail(PLATFORM_ADMIN_EMAIL);
   }
 
-  async function loginAsInstitutionUser() {
-    await loginWithEmail("client@example.edu");
+  async function loginAsInstitutionUser(email: string) {
+    await loginWithEmail(email);
   }
 
   async function logout() {

@@ -11,20 +11,29 @@
  * 3. Load the user's profile and role.
  * 4. Load the target app metadata.
  * 5. Verify the user can save versions for this app.
+ *    - platform_admin can save
+ *    - editor can save within their own organization
+ *    - viewer cannot save versions
  * 6. Find the latest version number for the app.
- * 7. Upload the current `generated-app/` source files to Supabase Storage.
- * 8. Insert a new `app_versions` row pointing to that saved source snapshot.
+ * 7. Upload the current generated-app source files to Supabase Storage.
+ * 8. Insert a new app_versions row pointing to that saved source snapshot.
  *
  * GET /api/apps/[appId]/versions
  * Lists all saved versions for an app, newest first.
+ *
+ * Access rules:
+ * - platform_admin can view any app's versions
+ * - editor can view versions for apps in their own organization
+ * - viewer can view versions for apps in their own organization
  *
  * Important design note:
  * Versions are append-only source snapshots. Saving a new version does not
  * publish it or mutate older versions.
  *
  * Future hardening:
- * distinguish editor/admin permissions, add version labels or notes, and
- * consider optimistic locking if multiple users edit the same app.
+ * - add version labels or notes
+ * - consider optimistic locking if multiple users edit the same app
+ * - optionally track richer audit metadata for who saved each version and why
  */
 
 import { NextResponse } from "next/server";
@@ -99,12 +108,26 @@ export async function POST(
     }
 
     const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isEditor = userProfile.role === "editor";
     const isOwnOrganization =
       userProfile.organization_id === app.organization_id;
 
-    if (!isPlatformAdmin && !isOwnOrganization) {
+    if (userProfile.role === "viewer") {
       return NextResponse.json(
-        { success: false, error: "Not allowed to save versions for this app" },
+        {
+          success: false,
+          error: "Viewers cannot save app versions",
+        },
+        { status: 403 },
+      );
+    }
+
+    if (!isPlatformAdmin && !(isEditor && isOwnOrganization)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not allowed to save versions for this app",
+        },
         { status: 403 },
       );
     }

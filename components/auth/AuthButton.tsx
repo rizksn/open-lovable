@@ -9,10 +9,6 @@ export function AuthButton() {
   const { user, loading, logout } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
 
-  console.log("AuthButton rendered");
-  console.log("loading:", loading);
-  console.log("user:", user);
-
   if (loading) return null;
 
   if (user) {
@@ -31,6 +27,7 @@ export function AuthButton() {
         <button
           onClick={async () => {
             await logout();
+            window.location.href = "/";
           }}
           className="rounded-md border border-white/10 bg-white/10 px-30 py-2 text-xs font-medium text-white hover:bg-white/15"
         >

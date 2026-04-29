@@ -39,11 +39,14 @@ export default function InstitutionPage() {
   const PUBLIC_APP_BASE_URL =
     process.env.NEXT_PUBLIC_APP_BASE_URL ?? "http://localhost:3000";
 
+  const isViewer = user?.role === "viewer";
+  const canPersist = user?.role === "editor" || user?.role === "platform_admin";
+
   const workspacePermissions: AppWorkspacePermissions = {
     canCreateOrganization: false,
     canSwitchOrganization: false,
-    canPublishApp: true,
-    canDeleteApp: true,
+    canPublishApp: canPersist,
+    canDeleteApp: canPersist,
   };
 
   useEffect(() => {
@@ -132,16 +135,21 @@ export default function InstitutionPage() {
 
           <AppPromptComposer
             isAuthenticated={Boolean(user)}
+            canSave={canPersist}
             currentAppId={builder.currentAppId}
             mode={mode}
             prompt={builder.prompt}
             hasGeneratedApp={builder.hasGeneratedApp}
             errorMessage={organizationError ?? builder.errorMessage}
             isGenerating={builder.isGenerating}
-            onOpenSaveModal={() => {
-              builder.setSaveAppError(null);
-              builder.setIsSaveAppOpen(true);
-            }}
+            onOpenSaveModal={
+              canPersist
+                ? () => {
+                    builder.setSaveAppError(null);
+                    builder.setIsSaveAppOpen(true);
+                  }
+                : undefined
+            }
             onPromptChange={builder.setPrompt}
             onGenerate={builder.handleGenerate}
             onReset={builder.handleReset}

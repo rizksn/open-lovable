@@ -2,13 +2,14 @@ type AppBuilderMode = "create" | "edit";
 
 type AppPromptComposerProps = {
   isAuthenticated: boolean;
+  canSave: boolean;
   currentAppId: string | null;
   mode: AppBuilderMode;
   prompt: string;
   hasGeneratedApp: boolean;
   errorMessage: string | null;
   isGenerating: boolean;
-  onOpenSaveModal: () => void;
+  onOpenSaveModal?: () => void;
   onPromptChange: (value: string) => void;
   onGenerate: () => void | Promise<void>;
   onReset: () => void | Promise<void>;
@@ -16,6 +17,7 @@ type AppPromptComposerProps = {
 
 export function AppPromptComposer({
   isAuthenticated,
+  canSave,
   currentAppId,
   mode,
   prompt,
@@ -29,10 +31,10 @@ export function AppPromptComposer({
 }: AppPromptComposerProps) {
   return (
     <>
-      {isAuthenticated && (
+      {isAuthenticated && canSave && (
         <button
           type="button"
-          onClick={onOpenSaveModal}
+          onClick={() => onOpenSaveModal?.()}
           className="ml-6 mt-3 block h-24 w-full rounded-lg bg-cyan-300 pl-20 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
         >
           {currentAppId ? "Save new version" : "Save app"}

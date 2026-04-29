@@ -190,6 +190,7 @@ export default function AdminHomePage() {
 
           <AppPromptComposer
             isAuthenticated={Boolean(user)}
+            canSave={true}
             currentAppId={builder.currentAppId}
             mode={mode}
             prompt={builder.prompt}

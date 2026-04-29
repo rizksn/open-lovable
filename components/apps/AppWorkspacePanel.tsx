@@ -78,7 +78,9 @@ export function AppWorkspacePanel({
               <span className="text-sm font-semibold text-slate-200">
                 {userRole === "platform_admin"
                   ? "OutRival Admin"
-                  : "Institution User"}
+                  : userRole === "editor"
+                    ? "Institution Editor"
+                    : "Institution Viewer"}
               </span>
             </div>
           </div>

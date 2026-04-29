@@ -493,6 +493,10 @@ export function useAppBuilder({
       if (selectedOrganization) {
         await fetchAppsForSelectedOrganization();
       }
+    } catch (error) {
+      setDeleteAppError(
+        error instanceof Error ? error.message : "Failed to delete app.",
+      );
     } finally {
       setIsDeletingApp(false);
     }

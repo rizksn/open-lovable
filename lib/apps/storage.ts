@@ -253,9 +253,18 @@ async function listSupabaseStorageFilesRecursively(params: {
     throw new Error(`Failed to list ${params.folderPath}: ${error.message}`);
   }
 
+  console.log("[storage-recursive] folderPath:", params.folderPath);
+  console.log("[storage-recursive] entries:", entries);
+
   const files = await Promise.all(
     (entries ?? []).map(async (entry) => {
       const objectPath = `${params.folderPath}/${entry.name}`;
+
+      console.log("[storage-recursive] inspecting:", {
+        objectPath,
+        metadata: entry.metadata,
+        id: entry.id,
+      });
 
       if (entry.metadata === null) {
         return listSupabaseStorageFilesRecursively({
@@ -285,17 +294,33 @@ export async function deleteSupabaseAppStorage(params: {
     folderPath: appStoragePath,
   });
 
+  console.log("[deleteSupabaseAppStorage] filesToDelete:", filesToDelete);
+
   if (filesToDelete.length === 0) {
+    console.log("[deleteSupabaseAppStorage] no files found");
     return;
   }
 
-  const { error } = await params.supabase.storage
+  const { data, error } = await params.supabase.storage
     .from("apps")
     .remove(filesToDelete);
+
+  console.log("[deleteSupabaseAppStorage] remove result:", { data, error });
 
   if (error) {
     throw new Error(`Failed to delete app storage files: ${error.message}`);
   }
+
+  const { data: remainingEntries, error: remainingError } =
+    await params.supabase.storage.from("apps").list(appStoragePath, {
+      limit: 1000,
+    });
+
+  console.log("[deleteSupabaseAppStorage] remainingEntries after delete:", {
+    appStoragePath,
+    remainingEntries,
+    remainingError,
+  });
 }
 
 export async function deleteSupabaseVersionStorage(params: {
@@ -318,5 +343,30 @@ export async function deleteSupabaseVersionStorage(params: {
 
   if (error) {
     throw new Error(`Failed to delete version storage files: ${error.message}`);
+  }
+}
+
+export async function deleteSupabasePublishedAppStorage(params: {
+  supabase: SupabaseClient;
+  appId: string;
+}) {
+  const filesToDelete = await listSupabaseStorageFilesRecursively({
+    supabase: params.supabase,
+    bucket: "published-apps",
+    folderPath: params.appId,
+  });
+
+  if (filesToDelete.length === 0) {
+    return;
+  }
+
+  const { error } = await params.supabase.storage
+    .from("published-apps")
+    .remove(filesToDelete);
+
+  if (error) {
+    throw new Error(
+      `Failed to delete published app storage files: ${error.message}`,
+    );
   }
 }

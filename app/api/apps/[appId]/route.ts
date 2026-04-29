@@ -27,7 +27,10 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { deleteSupabaseAppStorage } from "@/lib/apps/storage";
+import {
+  deleteSupabaseAppStorage,
+  deleteSupabasePublishedAppStorage,
+} from "@/lib/apps/storage";
 
 export async function DELETE(
   _request: Request,
@@ -98,6 +101,11 @@ export async function DELETE(
       supabase: supabaseServer,
       organizationId: app.organization_id,
       appSlug: app.slug,
+    });
+
+    await deleteSupabasePublishedAppStorage({
+      supabase: supabaseServer,
+      appId: app.id,
     });
 
     const { error: versionsError } = await supabaseServer

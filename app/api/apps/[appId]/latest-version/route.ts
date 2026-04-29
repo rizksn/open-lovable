@@ -45,6 +45,19 @@ export async function GET(
       );
     }
 
+    const { data: userProfile, error: profileError } = await supabase
+      .from("users")
+      .select("id, role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user" },
+        { status: 401 },
+      );
+    }
+
     const { data: app, error: appError } = await supabase
       .from("apps")
       .select("id, name, slug, organization_id")
@@ -55,6 +68,17 @@ export async function GET(
       return NextResponse.json(
         { success: false, error: "App not found" },
         { status: 404 },
+      );
+    }
+
+    const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isOwnOrganization =
+      userProfile.organization_id === app.organization_id;
+
+    if (!isPlatformAdmin && !isOwnOrganization) {
+      return NextResponse.json(
+        { success: false, error: "Not allowed to load this app" },
+        { status: 403 },
       );
     }
 
@@ -79,8 +103,6 @@ export async function GET(
         { status: 500 },
       );
     }
-
-    console.log("[latest-version] storage_path:", latestVersion.storage_path);
 
     const files = await hydrateGeneratedAppFromSupabaseVersion({
       supabase,

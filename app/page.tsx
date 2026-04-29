@@ -86,6 +86,7 @@ export default function HomePage() {
           hasGeneratedApp={builder.hasGeneratedApp}
           errorMessage={builder.errorMessage}
           isGenerating={builder.isGenerating}
+          canSave={false}
           onOpenSaveModal={() => {}}
           onPromptChange={builder.setPrompt}
           onGenerate={builder.handleGenerate}

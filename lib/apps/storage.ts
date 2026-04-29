@@ -297,3 +297,26 @@ export async function deleteSupabaseAppStorage(params: {
     throw new Error(`Failed to delete app storage files: ${error.message}`);
   }
 }
+
+export async function deleteSupabaseVersionStorage(params: {
+  supabase: SupabaseClient;
+  storagePath: string;
+}) {
+  const filesToDelete = await listSupabaseStorageFilesRecursively({
+    supabase: params.supabase,
+    bucket: "apps",
+    folderPath: params.storagePath,
+  });
+
+  if (filesToDelete.length === 0) {
+    return;
+  }
+
+  const { error } = await params.supabase.storage
+    .from("apps")
+    .remove(filesToDelete);
+
+  if (error) {
+    throw new Error(`Failed to delete version storage files: ${error.message}`);
+  }
+}

@@ -38,7 +38,10 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadGeneratedAppToSupabaseVersion } from "@/lib/apps/storage";
+import {
+  uploadGeneratedAppToSupabaseVersion,
+  deleteSupabaseVersionStorage,
+} from "@/lib/apps/storage";
 
 type CreateAppVersionRequest = {
   prompt: string;
@@ -49,6 +52,9 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ appId: string }> },
 ) {
+  const supabaseServer = await createSupabaseServerClient();
+  let uploadedStoragePath: string | null = null;
+
   try {
     const { appId } = await params;
     const body = (await request.json()) as CreateAppVersionRequest;
@@ -66,8 +72,6 @@ export async function POST(
         { status: 400 },
       );
     }
-
-    const supabaseServer = await createSupabaseServerClient();
 
     const {
       data: { user },
@@ -142,18 +146,12 @@ export async function POST(
         .maybeSingle();
 
     if (latestVersionError) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: latestVersionError.message,
-        },
-        { status: 500 },
-      );
+      throw new Error(latestVersionError.message);
     }
 
     const nextVersionNumber = (latestVersion?.version_number ?? 0) + 1;
 
-    const storagePath = await uploadGeneratedAppToSupabaseVersion({
+    uploadedStoragePath = await uploadGeneratedAppToSupabaseVersion({
       supabase: supabaseServer,
       organizationId: app.organization_id,
       appSlug: app.slug,
@@ -167,20 +165,14 @@ export async function POST(
         version_number: nextVersionNumber,
         prompt: body.prompt,
         files: body.files,
-        storage_path: storagePath,
+        storage_path: uploadedStoragePath,
         created_by_user_id: user.id,
       })
       .select("id, version_number, storage_path, created_at")
       .single();
 
     if (versionError || !version) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: versionError?.message ?? "Failed to create app version",
-        },
-        { status: 500 },
-      );
+      throw new Error(versionError?.message ?? "Failed to create app version");
     }
 
     return NextResponse.json({
@@ -194,6 +186,20 @@ export async function POST(
       },
     });
   } catch (error) {
+    if (uploadedStoragePath) {
+      try {
+        await deleteSupabaseVersionStorage({
+          supabase: supabaseServer,
+          storagePath: uploadedStoragePath,
+        });
+      } catch (cleanupError) {
+        console.error("Failed to clean up uploaded version storage", {
+          uploadedStoragePath,
+          cleanupError,
+        });
+      }
+    }
+
     console.error("[create-app-version] failed:", error);
 
     return NextResponse.json(

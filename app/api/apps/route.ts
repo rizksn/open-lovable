@@ -25,7 +25,10 @@
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { uploadGeneratedAppToSupabaseVersion } from "@/lib/apps/storage";
+import {
+  uploadGeneratedAppToSupabaseVersion,
+  deleteSupabaseVersionStorage,
+} from "@/lib/apps/storage";
 
 type CreateAppRequest = {
   organizationId: string;
@@ -45,6 +48,11 @@ function createSlug(name: string) {
 }
 
 export async function POST(request: Request) {
+  const supabaseServer = await createSupabaseServerClient();
+
+  let createdAppId: string | null = null;
+  let uploadedStoragePath: string | null = null;
+
   try {
     const body = (await request.json()) as CreateAppRequest;
 
@@ -61,8 +69,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    const supabaseServer = await createSupabaseServerClient();
 
     const {
       data: { user },
@@ -96,10 +102,7 @@ export async function POST(request: Request) {
 
     if (userProfile.role === "viewer") {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Viewers cannot save apps",
-        },
+        { success: false, error: "Viewers cannot save apps" },
         { status: 403 },
       );
     }
@@ -129,13 +132,12 @@ export async function POST(request: Request) {
       .single();
 
     if (appError || !app) {
-      return NextResponse.json(
-        { success: false, error: appError?.message ?? "Failed to create app" },
-        { status: 500 },
-      );
+      throw new Error(appError?.message ?? "Failed to create app");
     }
 
-    const storagePath = await uploadGeneratedAppToSupabaseVersion({
+    createdAppId = app.id;
+
+    uploadedStoragePath = await uploadGeneratedAppToSupabaseVersion({
       supabase: supabaseServer,
       organizationId: body.organizationId,
       appSlug: app.slug,
@@ -149,15 +151,12 @@ export async function POST(request: Request) {
         version_number: 1,
         prompt: body.prompt,
         files: body.files,
-        storage_path: storagePath,
+        storage_path: uploadedStoragePath,
         created_by_user_id: user.id,
       });
 
     if (versionError) {
-      return NextResponse.json(
-        { success: false, error: versionError.message },
-        { status: 500 },
-      );
+      throw new Error(versionError.message);
     }
 
     return NextResponse.json({
@@ -166,6 +165,31 @@ export async function POST(request: Request) {
       slug: app.slug,
     });
   } catch (error) {
+    if (uploadedStoragePath) {
+      try {
+        await deleteSupabaseVersionStorage({
+          supabase: supabaseServer,
+          storagePath: uploadedStoragePath,
+        });
+      } catch (cleanupError) {
+        console.error("Failed to clean up uploaded version storage", {
+          uploadedStoragePath,
+          cleanupError,
+        });
+      }
+    }
+
+    if (createdAppId) {
+      try {
+        await supabaseServer.from("apps").delete().eq("id", createdAppId);
+      } catch (cleanupError) {
+        console.error("Failed to clean up app row", {
+          createdAppId,
+          cleanupError,
+        });
+      }
+    }
+
     return NextResponse.json(
       {
         success: false,

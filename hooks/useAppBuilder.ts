@@ -249,7 +249,8 @@ export function useAppBuilder({
 
         setIsSaveAppOpen(false);
         setAppName("");
-
+        setSaveAppError(null);
+        setStatus("success");
         return;
       }
 
@@ -263,9 +264,11 @@ export function useAppBuilder({
         return;
       }
 
+      const trimmedAppName = appName.trim();
+
       const data = await saveApp({
         organizationId: selectedOrganization.id,
-        name: appName.trim(),
+        name: trimmedAppName,
         prompt: promptToSave,
         files: lastFilesWritten,
       });
@@ -277,12 +280,16 @@ export function useAppBuilder({
 
       setCurrentAppId(data.appId);
       setCurrentAppSlug(data.slug);
-      setCurrentAppName(appName.trim());
+      setCurrentAppName(trimmedAppName);
 
       setIsSaveAppOpen(false);
       setAppName("");
       setSaveAppError(null);
       setStatus("success");
+    } catch (error) {
+      setSaveAppError(
+        error instanceof Error ? error.message : "Failed to save app.",
+      );
     } finally {
       setIsSavingApp(false);
     }

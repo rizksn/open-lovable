@@ -27,6 +27,10 @@ export function appVersionLocalPath(params: {
   );
 }
 
+export function templateStoragePath(params: { templateId: string }) {
+  return `${params.templateId}/source`;
+}
+
 async function copyDirectoryContentsWithoutNodeModules(
   sourcePath: string,
   destinationPath: string,
@@ -140,8 +144,70 @@ export async function uploadGeneratedAppToSupabaseVersion(params: {
   return storageBasePath;
 }
 
-export async function hydrateGeneratedAppFromSupabaseVersion(params: {
+export async function uploadGeneratedAppToSupabaseTemplate(params: {
   supabase: SupabaseClient;
+  templateId: string;
+}) {
+  const sourceRoot = generatedAppPath();
+  const storageBasePath = templateStoragePath({
+    templateId: params.templateId,
+  });
+
+  const files = await walkFiles(sourceRoot);
+
+  const ignoredTopLevelDirs = new Set([
+    "dist",
+    "node_modules",
+    ".git",
+    ".next",
+    ".vite",
+  ]);
+
+  const ignoredFileNames = new Set([
+    ".DS_Store",
+    ".gitignore",
+    "package-lock.json",
+    "pnpm-lock.yaml",
+    "yarn.lock",
+  ]);
+
+  const filteredFiles = files.filter((filePath) => {
+    const relativePath = path.relative(sourceRoot, filePath);
+    const pathParts = relativePath.split(path.sep);
+
+    if (pathParts.length === 0) return false;
+    if (ignoredTopLevelDirs.has(pathParts[0])) return false;
+    if (pathParts.some((part) => ignoredFileNames.has(part))) return false;
+
+    return true;
+  });
+
+  await Promise.all(
+    filteredFiles.map(async (filePath) => {
+      const relativePath = path.relative(sourceRoot, filePath);
+      const storagePath = `${storageBasePath}/${relativePath}`;
+      const fileBuffer = await fs.readFile(filePath);
+
+      const { error } = await params.supabase.storage
+        .from("templates")
+        .upload(storagePath, fileBuffer, {
+          upsert: true,
+        });
+
+      if (error) {
+        throw new Error(
+          `Failed to upload template file ${relativePath}: ${error.message}`,
+        );
+      }
+    }),
+  );
+
+  return storageBasePath;
+}
+
+async function hydrateGeneratedAppFromSupabaseStorage(params: {
+  supabase: SupabaseClient;
+  bucket: "apps" | "templates";
   storagePath: string;
 }) {
   const targetRoot = generatedAppPath();
@@ -170,7 +236,7 @@ export async function hydrateGeneratedAppFromSupabaseVersion(params: {
     await fs.mkdir(localFolderPath, { recursive: true });
 
     const { data: entries, error } = await params.supabase.storage
-      .from("apps")
+      .from(params.bucket)
       .list(storageFolderPath, {
         limit: 1000,
       });
@@ -190,7 +256,7 @@ export async function hydrateGeneratedAppFromSupabaseVersion(params: {
         }
 
         const { data, error: downloadError } = await params.supabase.storage
-          .from("apps")
+          .from(params.bucket)
           .download(storageObjectPath);
 
         if (downloadError || !data) {
@@ -265,13 +331,41 @@ export async function hydrateGeneratedAppFromSupabaseVersion(params: {
         file.path.startsWith("public/"),
     );
 
-    filteredLoadedFiles.push({ path: "src/__preview_version__.js" });
+    const previewMarkerFile = { path: "src/__preview_version__.js" };
 
+    if (
+      !filteredLoadedFiles.some((file) => file.path === previewMarkerFile.path)
+    ) {
+      filteredLoadedFiles.push(previewMarkerFile);
+    }
     return filteredLoadedFiles.sort((a, b) => a.path.localeCompare(b.path));
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true });
   }
 }
+
+export async function hydrateGeneratedAppFromSupabaseVersion(params: {
+  supabase: SupabaseClient;
+  storagePath: string;
+}) {
+  return hydrateGeneratedAppFromSupabaseStorage({
+    supabase: params.supabase,
+    bucket: "apps",
+    storagePath: params.storagePath,
+  });
+}
+
+export async function hydrateGeneratedAppFromSupabaseTemplate(params: {
+  supabase: SupabaseClient;
+  storagePath: string;
+}) {
+  return hydrateGeneratedAppFromSupabaseStorage({
+    supabase: params.supabase,
+    bucket: "templates",
+    storagePath: params.storagePath,
+  });
+}
+
 async function listSupabaseStorageFilesRecursively(params: {
   supabase: SupabaseClient;
   bucket: string;
@@ -404,6 +498,31 @@ export async function deleteSupabasePublishedAppStorage(params: {
   if (error) {
     throw new Error(
       `Failed to delete published app storage files: ${error.message}`,
+    );
+  }
+}
+
+export async function deleteSupabaseTemplateStorage(params: {
+  supabase: SupabaseClient;
+  storagePath: string;
+}) {
+  const filesToDelete = await listSupabaseStorageFilesRecursively({
+    supabase: params.supabase,
+    bucket: "templates",
+    folderPath: params.storagePath,
+  });
+
+  if (filesToDelete.length === 0) {
+    return;
+  }
+
+  const { error } = await params.supabase.storage
+    .from("templates")
+    .remove(filesToDelete);
+
+  if (error) {
+    throw new Error(
+      `Failed to delete template storage files: ${error.message}`,
     );
   }
 }

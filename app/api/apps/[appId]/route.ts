@@ -109,18 +109,31 @@ export async function DELETE(
       appSlug: app.slug,
     });
 
-    const { error: unpublishError } = await supabaseServer
+    const { error: appDetachError } = await supabaseServer
       .from("apps")
       .update({
+        current_version_id: null,
         published_version_id: null,
         is_published: false,
         published_at: null,
       })
       .eq("id", app.id);
 
-    if (unpublishError) {
+    if (appDetachError) {
       return NextResponse.json(
-        { success: false, error: unpublishError.message },
+        { success: false, error: appDetachError.message },
+        { status: 500 },
+      );
+    }
+
+    const { error: deploymentsError } = await supabaseServer
+      .from("app_deployments")
+      .delete()
+      .eq("app_id", app.id);
+
+    if (deploymentsError) {
+      return NextResponse.json(
+        { success: false, error: deploymentsError.message },
         { status: 500 },
       );
     }

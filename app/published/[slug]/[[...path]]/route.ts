@@ -15,8 +15,9 @@ function getContentType(filePath: string) {
   if (filePath.endsWith(".json")) return "application/json; charset=utf-8";
   if (filePath.endsWith(".svg")) return "image/svg+xml";
   if (filePath.endsWith(".png")) return "image/png";
-  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg"))
+  if (filePath.endsWith(".jpg") || filePath.endsWith(".jpeg")) {
     return "image/jpeg";
+  }
   if (filePath.endsWith(".webp")) return "image/webp";
   if (filePath.endsWith(".ico")) return "image/x-icon";
   if (filePath.endsWith(".woff")) return "font/woff";
@@ -35,7 +36,7 @@ export async function GET(
 
   const { data: app, error: appError } = await supabase
     .from("apps")
-    .select("id, slug, organization_id, is_published")
+    .select("id, slug, is_published, published_version_id")
     .eq("slug", slug)
     .eq("is_published", true)
     .single();
@@ -47,10 +48,32 @@ export async function GET(
     );
   }
 
+  const { data: deployment, error: deploymentError } = await supabase
+    .from("app_deployments")
+    .select("id, storage_path, public_slug, status, app_version_id")
+    .eq("app_id", app.id)
+    .eq("status", "success")
+    .eq("app_version_id", app.published_version_id)
+    .maybeSingle();
+
+  if (deploymentError || !deployment) {
+    console.error("[published-app] Failed to resolve deployment:", {
+      slug,
+      appId: app.id,
+      publishedVersionId: app.published_version_id,
+      deploymentError,
+    });
+
+    return NextResponse.json(
+      { success: false, error: "Published deployment not found" },
+      { status: 404 },
+    );
+  }
+
   const requestedPath =
     assetPath.length > 0 ? assetPath.join("/") : "index.html";
 
-  const storagePath = `${app.organization_id}/${app.slug}/dist/${requestedPath}`;
+  const storagePath = `${deployment.storage_path}/${requestedPath}`;
 
   const { data: fileBlob, error: downloadError } = await supabase.storage
     .from("published-apps")
@@ -59,6 +82,8 @@ export async function GET(
   if (downloadError || !fileBlob) {
     console.error("[published-app] Failed to load asset:", {
       slug,
+      appId: app.id,
+      deploymentId: deployment.id,
       requestedPath,
       storagePath,
       downloadError,
@@ -73,8 +98,6 @@ export async function GET(
   if (requestedPath === "index.html") {
     let html = await fileBlob.text();
 
-    // Inject base tag so relative asset paths (./assets/...) resolve
-    // under /published/{slug}/ instead of /published/
     html = html.replace(
       "<head>",
       `<head>\n    <base href="/published/${app.slug}/">`,

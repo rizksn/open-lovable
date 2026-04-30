@@ -286,3 +286,83 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const organizationId = searchParams.get("organizationId");
+
+    if (!organizationId) {
+      return NextResponse.json(
+        { success: false, error: "Missing organizationId" },
+        { status: 400 },
+      );
+    }
+
+    const supabaseServer = await createSupabaseServerClient();
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseServer.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
+    }
+
+    const { data: userProfile, error: userError } = await supabaseServer
+      .from("users")
+      .select("id, role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (userError || !userProfile) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user" },
+        { status: 401 },
+      );
+    }
+
+    const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isOwnOrganization = userProfile.organization_id === organizationId;
+
+    if (!isPlatformAdmin && !isOwnOrganization) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Not allowed to view apps for this organization",
+        },
+        { status: 403 },
+      );
+    }
+
+    const { data: apps, error: appsError } = await supabaseServer
+      .from("apps")
+      .select("id, name, slug, status, organization_id, created_at")
+      .eq("organization_id", organizationId)
+      .order("created_at", { ascending: false });
+
+    if (appsError) {
+      return NextResponse.json(
+        { success: false, error: appsError.message },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      apps: apps ?? [],
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}

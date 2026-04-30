@@ -96,8 +96,29 @@ export async function uploadGeneratedAppToSupabaseVersion(params: {
   const storageBasePath = `${appVersionStoragePath(params)}/source`;
   const files = await walkFiles(sourceRoot);
 
+  const ignoredTopLevelDirs = new Set([
+    "dist",
+    "node_modules",
+    ".git",
+    ".next",
+    ".vite",
+  ]);
+
+  const ignoredFileNames = new Set([".DS_Store"]);
+
+  const filteredFiles = files.filter((filePath) => {
+    const relativePath = path.relative(sourceRoot, filePath);
+    const pathParts = relativePath.split(path.sep);
+
+    if (pathParts.length === 0) return false;
+    if (ignoredTopLevelDirs.has(pathParts[0])) return false;
+    if (pathParts.some((part) => ignoredFileNames.has(part))) return false;
+
+    return true;
+  });
+
   await Promise.all(
-    files.map(async (filePath) => {
+    filteredFiles.map(async (filePath) => {
       const relativePath = path.relative(sourceRoot, filePath);
       const storagePath = `${storageBasePath}/${relativePath}`;
       const fileBuffer = await fs.readFile(filePath);

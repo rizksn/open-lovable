@@ -47,14 +47,20 @@ function getContentType(filePath: string) {
     return "image/jpeg";
   }
   if (filePath.endsWith(".webp")) return "image/webp";
+  if (filePath.endsWith(".ico")) return "image/x-icon";
+  if (filePath.endsWith(".woff")) return "font/woff";
+  if (filePath.endsWith(".woff2")) return "font/woff2";
   return "application/octet-stream";
 }
 
 export async function POST(_request: Request, { params }: RouteParams) {
+  const supabase = await createSupabaseServerClient();
+
+  let deploymentId: string | null = null;
+  let tempRoot: string | null = null;
+
   try {
     const { appId } = await params;
-
-    const supabase = await createSupabaseServerClient();
 
     const {
       data: { user },
@@ -68,13 +74,13 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const { data: currentUser, error: userError } = await supabase
+    const { data: userProfile, error: userError } = await supabase
       .from("users")
       .select("id, role, organization_id")
       .eq("id", user.id)
       .single();
 
-    if (userError || !currentUser) {
+    if (userError || !userProfile) {
       return NextResponse.json(
         { success: false, error: "User profile not found" },
         { status: 403 },
@@ -83,7 +89,9 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     const { data: app, error: appError } = await supabase
       .from("apps")
-      .select("id, slug, organization_id")
+      .select(
+        "id, slug, organization_id, current_version_id, published_version_id",
+      )
       .eq("id", appId)
       .single();
 
@@ -94,17 +102,14 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const isPlatformAdmin = currentUser.role === "platform_admin";
-    const isEditor = currentUser.role === "editor";
+    const isPlatformAdmin = userProfile.role === "platform_admin";
+    const isEditor = userProfile.role === "editor";
     const isOwnOrganization =
-      currentUser.organization_id === app.organization_id;
+      userProfile.organization_id === app.organization_id;
 
-    if (currentUser.role === "viewer") {
+    if (userProfile.role === "viewer") {
       return NextResponse.json(
-        {
-          success: false,
-          error: "Viewers cannot publish apps",
-        },
+        { success: false, error: "Viewers cannot publish apps" },
         { status: 403 },
       );
     }
@@ -119,29 +124,108 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
-    const { data: latestVersion, error: versionError } = await supabase
-      .from("app_versions")
-      .select("id, version_number, storage_path")
-      .eq("app_id", appId)
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (versionError || !latestVersion) {
+    if (!app.current_version_id) {
       return NextResponse.json(
         { success: false, error: "No saved version found to publish" },
+        { status: 400 },
+      );
+    }
+
+    const { data: currentVersion, error: versionError } = await supabase
+      .from("app_versions")
+      .select("id, version_number, storage_path")
+      .eq("id", app.current_version_id)
+      .eq("app_id", app.id)
+      .single();
+
+    if (versionError || !currentVersion) {
+      return NextResponse.json(
+        { success: false, error: "Current saved version not found" },
         { status: 404 },
       );
     }
 
-    const sourceBasePath = latestVersion.storage_path;
     const publishedBasePath = `${app.organization_id}/${app.slug}/dist`;
+    const publicBaseUrl =
+      process.env.NEXT_PUBLIC_APP_BASE_URL ?? "http://localhost:3000";
+    const publicUrl = `${publicBaseUrl}/published/${app.slug}`;
 
-    const tempRoot = path.join(
-      process.cwd(),
-      ".publish-tmp",
-      `${app.id}-${latestVersion.id}`,
-    );
+    console.log("[publish-app] publish requested", {
+      appId: app.id,
+      slug: app.slug,
+      organizationId: app.organization_id,
+      currentVersionId: currentVersion.id,
+      currentVersionNumber: currentVersion.version_number,
+      sourceStoragePath: currentVersion.storage_path,
+      publishedBasePath,
+      userId: user.id,
+      role: userProfile.role,
+    });
+
+    const { data: existingDeployment, error: existingDeploymentError } =
+      await supabase
+        .from("app_deployments")
+        .select("id, public_slug")
+        .eq("app_id", app.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+    if (existingDeploymentError) {
+      throw new Error(existingDeploymentError.message);
+    }
+
+    if (existingDeployment) {
+      deploymentId = existingDeployment.id;
+
+      const { error: resetDeploymentError } = await supabase
+        .from("app_deployments")
+        .update({
+          app_version_id: currentVersion.id,
+          public_slug: app.slug,
+          public_url: publicUrl,
+          storage_path: publishedBasePath,
+          status: "pending",
+          deployed_by_user_id: user.id,
+          deployed_at: null,
+        })
+        .eq("id", existingDeployment.id);
+
+      if (resetDeploymentError) {
+        throw new Error(resetDeploymentError.message);
+      }
+    } else {
+      const { data: createdDeployment, error: createDeploymentError } =
+        await supabase
+          .from("app_deployments")
+          .insert({
+            app_id: app.id,
+            app_version_id: currentVersion.id,
+            public_slug: app.slug,
+            public_url: publicUrl,
+            storage_path: publishedBasePath,
+            status: "pending",
+            deployed_by_user_id: user.id,
+            deployed_at: null,
+          })
+          .select("id")
+          .single();
+
+      if (createDeploymentError || !createdDeployment) {
+        throw new Error(
+          createDeploymentError?.message ?? "Failed to create deployment row",
+        );
+      }
+
+      deploymentId = createdDeployment.id;
+    }
+
+    console.log("[publish-app] deployment marked pending", {
+      deploymentId,
+      appId: app.id,
+      appVersionId: currentVersion.id,
+      storagePath: publishedBasePath,
+    });
 
     async function downloadFolder(
       storageFolderPath: string,
@@ -224,11 +308,17 @@ export async function POST(_request: Request, { params }: RouteParams) {
       );
     }
 
+    tempRoot = path.join(
+      process.cwd(),
+      ".publish-tmp",
+      `${app.id}-${currentVersion.id}`,
+    );
+
     try {
       await fs.rm(tempRoot, { recursive: true, force: true });
       await fs.mkdir(tempRoot, { recursive: true });
 
-      await downloadFolder(sourceBasePath, tempRoot);
+      await downloadFolder(currentVersion.storage_path, tempRoot);
 
       await fs.access(path.join(tempRoot, "package.json"));
       await fs.access(path.join(tempRoot, "index.html"));
@@ -237,7 +327,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
       const hasEntry = await Promise.any(
         entryCandidates.map((file) =>
-          fs.access(path.join(tempRoot, "src", file)).then(() => true),
+          fs.access(path.join(tempRoot!, "src", file)).then(() => true),
         ),
       ).catch(() => false);
 
@@ -260,25 +350,54 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
       await uploadFolder(distRoot, publishedBasePath);
     } finally {
-      await fs.rm(tempRoot, { recursive: true, force: true });
+      if (tempRoot) {
+        await fs.rm(tempRoot, { recursive: true, force: true });
+      }
     }
 
-    const publishedAt = new Date().toISOString();
+    const deployedAt = new Date().toISOString();
 
-    const { error: updateError } = await supabase
+    const { error: finalizeDeploymentError } = await supabase
+      .from("app_deployments")
+      .update({
+        app_version_id: currentVersion.id,
+        public_slug: app.slug,
+        public_url: publicUrl,
+        storage_path: publishedBasePath,
+        status: "success",
+        deployed_by_user_id: user.id,
+        deployed_at: deployedAt,
+      })
+      .eq("id", deploymentId);
+
+    if (finalizeDeploymentError) {
+      throw new Error(finalizeDeploymentError.message);
+    }
+
+    const { error: updateAppError } = await supabase
       .from("apps")
       .update({
+        status: "published",
         is_published: true,
-        published_version_id: latestVersion.id,
-        published_at: publishedAt,
+        published_version_id: currentVersion.id,
+        published_at: deployedAt,
       })
-      .eq("id", appId);
+      .eq("id", app.id);
 
-    if (updateError) {
+    if (updateAppError) {
       throw new Error(
-        `Failed to update app publish status: ${updateError.message}`,
+        `Failed to update app publish status: ${updateAppError.message}`,
       );
     }
+
+    console.log("[publish-app] publish succeeded", {
+      deploymentId,
+      appId: app.id,
+      appVersionId: currentVersion.id,
+      publishedStoragePath: publishedBasePath,
+      publicUrl,
+      deployedAt,
+    });
 
     return NextResponse.json({
       success: true,
@@ -287,13 +406,49 @@ export async function POST(_request: Request, { params }: RouteParams) {
         slug: app.slug,
         organizationId: app.organization_id,
         isPublished: true,
-        publishedVersionId: latestVersion.id,
-        publishedAt,
-        publishedVersionNumber: latestVersion.version_number,
-        publishedStoragePath: publishedBasePath,
+        publishedVersionId: currentVersion.id,
+        publishedAt: deployedAt,
+        publishedVersionNumber: currentVersion.version_number,
+      },
+      deployment: {
+        id: deploymentId,
+        appVersionId: currentVersion.id,
+        publicSlug: app.slug,
+        publicUrl,
+        storagePath: publishedBasePath,
+        status: "success",
+        deployedAt,
       },
     });
   } catch (error) {
+    if (deploymentId) {
+      try {
+        await supabase
+          .from("app_deployments")
+          .update({
+            status: "failed",
+            deployed_at: null,
+          })
+          .eq("id", deploymentId);
+      } catch (deploymentCleanupError) {
+        console.error("[publish-app] failed to mark deployment as failed", {
+          deploymentId,
+          deploymentCleanupError,
+        });
+      }
+    }
+
+    if (tempRoot) {
+      try {
+        await fs.rm(tempRoot, { recursive: true, force: true });
+      } catch (tempCleanupError) {
+        console.error("[publish-app] failed to clean temp folder", {
+          tempRoot,
+          tempCleanupError,
+        });
+      }
+    }
+
     console.error("[publish-app] failed:", error);
 
     return NextResponse.json(

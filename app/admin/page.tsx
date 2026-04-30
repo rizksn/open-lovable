@@ -211,7 +211,7 @@ export default function AdminHomePage() {
     setSelectTemplateError(null);
 
     try {
-      const data = await getTemplates();
+      const data = await getTemplates(selectedOrganization?.id ?? null);
 
       if (!data.success) {
         setSelectTemplateError(data.error ?? "Failed to load templates.");

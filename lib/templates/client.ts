@@ -1,5 +1,9 @@
-export async function getTemplates() {
-  const res = await fetch("/api/templates");
+export async function getTemplates(organizationId?: string | null) {
+  const query = organizationId
+    ? `?organizationId=${encodeURIComponent(organizationId)}`
+    : "";
+
+  const res = await fetch(`/api/templates${query}`);
   return res.json();
 }
 

@@ -204,9 +204,12 @@ export async function POST(request: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabaseServer = await createSupabaseServerClient();
+
+    const { searchParams } = new URL(request.url);
+    const organizationId = searchParams.get("organizationId");
 
     const {
       data: { user },
@@ -220,7 +223,20 @@ export async function GET() {
       );
     }
 
-    const { data: templates, error } = await supabaseServer
+    const { data: userProfile, error: profileError } = await supabaseServer
+      .from("users")
+      .select("id, role, organization_id")
+      .eq("id", user.id)
+      .single();
+
+    if (profileError || !userProfile) {
+      return NextResponse.json(
+        { success: false, error: "Invalid user" },
+        { status: 401 },
+      );
+    }
+
+    let query = supabaseServer
       .from("templates")
       .select(
         `
@@ -241,6 +257,22 @@ export async function GET() {
         `,
       )
       .order("updated_at", { ascending: false });
+
+    if (userProfile.role === "platform_admin") {
+      if (organizationId) {
+        query = query.or(
+          `visibility.eq.public,organization_id.eq.${organizationId}`,
+        );
+      } else {
+        query = query.eq("visibility", "public");
+      }
+    } else {
+      query = query.or(
+        `visibility.eq.public,organization_id.eq.${userProfile.organization_id}`,
+      );
+    }
+
+    const { data: templates, error } = await query;
 
     if (error) {
       throw new Error(error.message);

@@ -37,13 +37,16 @@ type UseAppBuilderReturn = {
   setPrompt: Dispatch<SetStateAction<string>>;
   isGenerating: boolean;
   hasGeneratedApp: boolean;
+  setHasGeneratedApp: Dispatch<SetStateAction<boolean>>;
   previewKey: number;
+  setPreviewKey: Dispatch<SetStateAction<number>>;
   history: HistoryItem[];
   lastFilesWritten: string[];
   latestPrompt: string;
   errorMessage: string | null;
   setErrorMessage: Dispatch<SetStateAction<string | null>>;
   status: AppBuilderStatus;
+  setStatus: Dispatch<SetStateAction<AppBuilderStatus>>;
 
   /* App state */
   apps: AppSummary[];
@@ -563,13 +566,16 @@ export function useAppBuilder({
     setPrompt,
     isGenerating,
     hasGeneratedApp,
+    setHasGeneratedApp,
     previewKey,
+    setPreviewKey,
     history,
     lastFilesWritten,
     latestPrompt,
     errorMessage,
     setErrorMessage,
     status,
+    setStatus,
 
     /* App state */
     apps,

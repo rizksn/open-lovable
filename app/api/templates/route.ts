@@ -231,8 +231,14 @@ export async function GET() {
         organization_id,
         storage_path,
         created_at,
-        updated_at
-      `,
+        updated_at,
+        organization:organizations (
+          id,
+          name,
+          slug,
+          created_at
+        )
+        `,
       )
       .order("updated_at", { ascending: false });
 

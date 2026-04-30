@@ -11,6 +11,8 @@ type AppWorkspacePanelProps = {
   currentAppSlug: string | null;
   hasGeneratedApp: boolean;
   isLoadingApps: boolean;
+  selectedTemplateName: string | null;
+  isLoadingTemplates: boolean;
   status: string;
   publicAppBaseUrl: string;
   permissions: AppWorkspacePermissions;
@@ -20,6 +22,7 @@ type AppWorkspacePanelProps = {
   onOpenVersionHistory: () => void;
   onPublishApp: () => void | Promise<void>;
   onOpenDeleteApp: () => void;
+  onSelectTemplate: () => void | Promise<void>;
 };
 
 export function AppWorkspacePanel({
@@ -32,6 +35,8 @@ export function AppWorkspacePanel({
   currentAppSlug,
   hasGeneratedApp,
   isLoadingApps,
+  selectedTemplateName,
+  isLoadingTemplates,
   status,
   publicAppBaseUrl,
   permissions,
@@ -41,6 +46,7 @@ export function AppWorkspacePanel({
   onOpenVersionHistory,
   onPublishApp,
   onOpenDeleteApp,
+  onSelectTemplate,
 }: AppWorkspacePanelProps) {
   return (
     <div className="shrink-0 border-b border-white/10 bg-slate-950/60 px-4 py-4">
@@ -142,6 +148,25 @@ export function AppWorkspacePanel({
 
             <p className="truncate text-sm font-semibold pb-4 text-white">
               {currentAppName ?? "New app"}
+            </p>
+
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                Template
+              </span>
+
+              <button
+                type="button"
+                onClick={onSelectTemplate}
+                disabled={isLoadingTemplates}
+                className="min-h-9 rounded-lg border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold leading-none text-slate-300 transition hover:border-cyan-300/25 hover:bg-cyan-300/10 hover:text-cyan-100 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isLoadingTemplates ? "Loading" : "Select"}
+              </button>
+            </div>
+
+            <p className="truncate pb-4 text-sm font-semibold text-white">
+              {selectedTemplateName ?? "Template library"}
             </p>
 
             <div className="mt-3 grid grid-cols-3 gap-2">

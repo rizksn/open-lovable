@@ -10,11 +10,18 @@ import { AppWorkspacePanel } from "@/components/apps/AppWorkspacePanel";
 import { DeleteAppModal } from "@/components/apps/DeleteAppModal";
 import { SaveAppModal } from "@/components/apps/SaveAppModal";
 import { SelectAppModal } from "@/components/apps/SelectAppModal";
+import {
+  SelectTemplateModal,
+  type TemplateSummary,
+} from "@/components/apps/SelectTemplateModal";
 import { VersionHistoryModal } from "@/components/apps/VersionHistoryModal";
 import { OutRivalHeader } from "@/components/layout/OutRivalHeader";
+
 import { useAuth } from "@/context/AuthContext";
 import { useAppBuilder } from "@/hooks/useAppBuilder";
+
 import { getOrganizationById } from "@/lib/organizations/client";
+import { getTemplates, loadTemplate } from "@/lib/templates/client";
 
 import type { AppWorkspacePermissions } from "@/types/app";
 import type { Organization } from "@/types/organizations";
@@ -22,10 +29,26 @@ import type { Organization } from "@/types/organizations";
 export default function InstitutionPage() {
   const { user } = useAuth();
 
+  /* Organization state */
   const [selectedOrganization, setSelectedOrganization] =
     useState<Organization | null>(null);
   const [isLoadingOrganization, setIsLoadingOrganization] = useState(true);
   const [organizationError, setOrganizationError] = useState<string | null>(
+    null,
+  );
+
+  /* Template state */
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [selectedTemplateName, setSelectedTemplateName] = useState<
+    string | null
+  >(null);
+
+  /* Select template modal state */
+  const [isSelectTemplateOpen, setIsSelectTemplateOpen] = useState(false);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isLoadingSelectedTemplate, setIsLoadingSelectedTemplate] =
+    useState(false);
+  const [selectTemplateError, setSelectTemplateError] = useState<string | null>(
     null,
   );
 
@@ -48,6 +71,59 @@ export default function InstitutionPage() {
     canPublishApp: canPersist,
     canDeleteApp: canPersist,
   };
+
+  async function fetchTemplates() {
+    setIsLoadingTemplates(true);
+    setSelectTemplateError(null);
+
+    try {
+      const data = await getTemplates();
+
+      if (!data.success) {
+        setSelectTemplateError(data.error ?? "Failed to load templates.");
+        return;
+      }
+
+      setTemplates(data.templates ?? []);
+      setIsSelectTemplateOpen(true);
+    } catch (error) {
+      setSelectTemplateError(
+        error instanceof Error ? error.message : "Failed to load templates.",
+      );
+    } finally {
+      setIsLoadingTemplates(false);
+    }
+  }
+
+  async function handleSelectTemplate(template: TemplateSummary) {
+    setIsLoadingSelectedTemplate(true);
+    setSelectTemplateError(null);
+
+    try {
+      const { ok, data } = await loadTemplate(template.id);
+
+      if (!ok || !data.success) {
+        setSelectTemplateError(data.error ?? "Failed to load template.");
+        return;
+      }
+
+      builder.setCurrentAppId(null);
+      builder.setCurrentAppSlug(null);
+      builder.setCurrentAppName(null);
+      builder.setHasGeneratedApp(true);
+      builder.setStatus("success");
+      builder.setPreviewKey((key) => key + 1);
+
+      setSelectedTemplateName(template.name);
+      setIsSelectTemplateOpen(false);
+    } catch (error) {
+      setSelectTemplateError(
+        error instanceof Error ? error.message : "Failed to load template.",
+      );
+    } finally {
+      setIsLoadingSelectedTemplate(false);
+    }
+  }
 
   useEffect(() => {
     async function loadOrganization() {
@@ -89,6 +165,7 @@ export default function InstitutionPage() {
     async function resetOnLogout() {
       if (!user) {
         clearBuilderState();
+        setSelectedTemplateName(null);
       }
     }
 
@@ -105,18 +182,21 @@ export default function InstitutionPage() {
             mode={mode}
             userRole={user?.role}
             selectedOrganizationName={selectedOrganization?.name}
+            selectedTemplateName={selectedTemplateName}
             hasSelectedOrganization={Boolean(selectedOrganization)}
             currentAppId={builder.currentAppId}
             currentAppName={builder.currentAppName}
             currentAppSlug={builder.currentAppSlug}
             hasGeneratedApp={builder.hasGeneratedApp}
             isLoadingApps={builder.isLoadingApps || isLoadingOrganization}
+            isLoadingTemplates={isLoadingTemplates}
             status={builder.status}
             publicAppBaseUrl={PUBLIC_APP_BASE_URL}
             permissions={workspacePermissions}
             onCreateOrganization={() => {}}
             onSwitchOrganization={() => {}}
             onSelectApp={builder.fetchAppsForSelectedOrganization}
+            onSelectTemplate={fetchTemplates}
             onOpenVersionHistory={builder.handleOpenVersionHistory}
             onPublishApp={builder.handlePublishApp}
             onOpenDeleteApp={() => {
@@ -136,6 +216,7 @@ export default function InstitutionPage() {
           <AppPromptComposer
             isAuthenticated={Boolean(user)}
             canSave={canPersist}
+            canSaveTemplate={false}
             currentAppId={builder.currentAppId}
             mode={mode}
             prompt={builder.prompt}
@@ -152,7 +233,10 @@ export default function InstitutionPage() {
             }
             onPromptChange={builder.setPrompt}
             onGenerate={builder.handleGenerate}
-            onReset={builder.handleReset}
+            onReset={async () => {
+              await builder.handleReset();
+              setSelectedTemplateName(null);
+            }}
           />
         </aside>
 
@@ -179,8 +263,25 @@ export default function InstitutionPage() {
           apps={builder.apps}
           selectAppError={builder.selectAppError}
           isLoadingSelectedApp={builder.isLoadingSelectedApp}
-          onSelectApp={builder.handleSelectApp}
+          onSelectApp={async (app) => {
+            await builder.handleSelectApp(app);
+            setSelectedTemplateName(null);
+          }}
           onClose={() => builder.setIsSelectAppOpen(false)}
+        />
+
+        <SelectTemplateModal
+          isOpen={isSelectTemplateOpen}
+          templates={templates}
+          selectTemplateError={selectTemplateError}
+          isLoadingSelectedTemplate={
+            isLoadingSelectedTemplate || isLoadingTemplates
+          }
+          onSelectTemplate={handleSelectTemplate}
+          onClose={() => {
+            setSelectTemplateError(null);
+            setIsSelectTemplateOpen(false);
+          }}
         />
 
         <VersionHistoryModal

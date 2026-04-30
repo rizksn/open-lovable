@@ -3,6 +3,7 @@ type AppBuilderMode = "create" | "edit";
 type AppPromptComposerProps = {
   isAuthenticated: boolean;
   canSave: boolean;
+  canSaveTemplate: boolean;
   currentAppId: string | null;
   mode: AppBuilderMode;
   prompt: string;
@@ -10,6 +11,7 @@ type AppPromptComposerProps = {
   errorMessage: string | null;
   isGenerating: boolean;
   onOpenSaveModal?: () => void;
+  onOpenSaveTemplateModal?: () => void;
   onPromptChange: (value: string) => void;
   onGenerate: () => void | Promise<void>;
   onReset: () => void | Promise<void>;
@@ -18,6 +20,7 @@ type AppPromptComposerProps = {
 export function AppPromptComposer({
   isAuthenticated,
   canSave,
+  canSaveTemplate,
   currentAppId,
   mode,
   prompt,
@@ -25,6 +28,7 @@ export function AppPromptComposer({
   errorMessage,
   isGenerating,
   onOpenSaveModal,
+  onOpenSaveTemplateModal,
   onPromptChange,
   onGenerate,
   onReset,
@@ -38,6 +42,16 @@ export function AppPromptComposer({
           className="ml-6 mt-3 block h-24 w-full rounded-lg bg-cyan-300 pl-20 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
         >
           {currentAppId ? "Save new version" : "Save app"}
+        </button>
+      )}
+
+      {isAuthenticated && canSaveTemplate && (
+        <button
+          type="button"
+          onClick={() => onOpenSaveTemplateModal?.()}
+          className="ml-6 mt-3 block h-24 w-full rounded-lg border border-emerald-400/30 bg-emerald-400/10 pl-20 text-sm font-bold text-emerald-200 shadow-lg shadow-emerald-400/10 transition hover:bg-emerald-400/15"
+        >
+          Save template
         </button>
       )}
 

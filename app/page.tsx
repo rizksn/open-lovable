@@ -87,7 +87,9 @@ export default function HomePage() {
           errorMessage={builder.errorMessage}
           isGenerating={builder.isGenerating}
           canSave={false}
+          canSaveTemplate={false}
           onOpenSaveModal={() => {}}
+          onOpenSaveTemplateModal={() => {}}
           onPromptChange={builder.setPrompt}
           onGenerate={builder.handleGenerate}
           onReset={builder.handleReset}

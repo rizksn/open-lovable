@@ -27,12 +27,12 @@ export function SaveAppModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-950 p-6 text-white shadow-2xl shadow-black/60">
+      <div className="w-full max-w-md rounded-lg border border-white/10 bg-slate-950 p-40 text-white shadow-2xl shadow-black/60">
         <h2 className="text-xl font-bold tracking-tight">
           {currentAppId ? "Save new version" : "Name your app"}
         </h2>
 
-        <p className="mt-2 text-sm leading-relaxed text-slate-500">
+        <p className="mt-18 mb-10 text-sm leading-relaxed text-slate-500">
           {currentAppId
             ? `This will save a new version of ${currentAppName ?? "this app"}.`
             : `This app will be saved under ${selectedOrganizationName ?? "this institution"}.`}
@@ -43,7 +43,7 @@ export function SaveAppModal({
             value={appName}
             onChange={(e) => onAppNameChange(e.target.value)}
             placeholder="App name"
-            className="mt-5 h-11 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
+            className="mt-5 mb-20 h-30 w-full rounded-lg border border-white/10 bg-white/[0.06] px-3.5 text-sm outline-none transition placeholder:text-slate-600 focus:border-cyan-300/45 focus:ring-4 focus:ring-cyan-300/10"
           />
         )}
 
@@ -57,7 +57,7 @@ export function SaveAppModal({
           <button
             type="button"
             onClick={onClose}
-            className="h-11 rounded-xl border border-white/10 bg-white/[0.06] px-4 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
+            className="h-30 rounded-lg border border-white/10 bg-white/[0.06] px-20 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
           >
             Cancel
           </button>
@@ -66,7 +66,7 @@ export function SaveAppModal({
             type="button"
             onClick={onSave}
             disabled={isSavingApp || (!currentAppId && !appName.trim())}
-            className="h-11 rounded-xl bg-cyan-300 px-4 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
+            className="h-30 rounded-lg bg-cyan-300 px-20 text-sm font-bold text-slate-950 transition hover:bg-cyan-200 disabled:opacity-50"
           >
             {isSavingApp
               ? "Saving..."

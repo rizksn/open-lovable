@@ -36,19 +36,19 @@ export async function GET(
 
     const versionNum = parseInt(versionNumber, 10);
 
-    if (isNaN(versionNum)) {
+    if (Number.isNaN(versionNum)) {
       return NextResponse.json(
         { success: false, error: "Invalid version number" },
         { status: 400 },
       );
     }
 
-    const supabaseServer = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
 
     const {
       data: { user },
       error: authError,
-    } = await supabaseServer.auth.getUser();
+    } = await supabase.auth.getUser();
 
     if (authError || !user) {
       return NextResponse.json(
@@ -57,7 +57,7 @@ export async function GET(
       );
     }
 
-    const { data: userProfile, error: userError } = await supabaseServer
+    const { data: userProfile, error: userError } = await supabase
       .from("users")
       .select("id, role, organization_id")
       .eq("id", user.id)
@@ -70,7 +70,7 @@ export async function GET(
       );
     }
 
-    const { data: app, error: appError } = await supabaseServer
+    const { data: app, error: appError } = await supabase
       .from("apps")
       .select("id, slug, organization_id")
       .eq("id", appId)
@@ -94,7 +94,7 @@ export async function GET(
       );
     }
 
-    const { data: version, error: versionError } = await supabaseServer
+    const { data: version, error: versionError } = await supabase
       .from("app_versions")
       .select("version_number, prompt, storage_path, created_at")
       .eq("app_id", appId)
@@ -115,8 +115,8 @@ export async function GET(
       );
     }
 
-    await hydrateGeneratedAppFromSupabaseVersion({
-      supabase: supabaseServer,
+    const files = await hydrateGeneratedAppFromSupabaseVersion({
+      supabase,
       storagePath: version.storage_path,
     });
 
@@ -128,6 +128,8 @@ export async function GET(
         storagePath: version.storage_path,
         createdAt: version.created_at,
       },
+      hydratedPath: "generated-app",
+      files,
     });
   } catch (error) {
     console.error("[load-version] failed:", error);

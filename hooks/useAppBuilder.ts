@@ -382,30 +382,26 @@ export function useAppBuilder({
 
     setIsLoadingSelectedVersion(true);
     setVersionHistoryError(null);
+    setErrorMessage(null);
+    setStatus("validating");
 
     try {
       const data = await getAppVersion(currentAppId, versionNumber);
 
       if (!data.success) {
         setVersionHistoryError(data.error ?? "Failed to load version.");
+        setStatus("error");
         return;
       }
 
       setLatestPrompt(data.version?.prompt ?? "");
-
-      const restartResult = await restartVitePreview();
-
-      if (!restartResult.ok) {
-        console.warn(
-          "[handleLoadVersion] Vite restart failed after version load",
-        );
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       setPreviewKey((key) => key + 1);
       setIsVersionHistoryOpen(false);
       setStatus("success");
+    } catch (error) {
+      console.error("[handleLoadVersion] failed:", error);
+      setVersionHistoryError("Something went wrong while loading the version.");
+      setStatus("error");
     } finally {
       setIsLoadingSelectedVersion(false);
     }

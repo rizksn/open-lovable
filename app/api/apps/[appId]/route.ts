@@ -105,8 +105,25 @@ export async function DELETE(
 
     await deleteSupabasePublishedAppStorage({
       supabase: supabaseServer,
-      appId: app.id,
+      organizationId: app.organization_id,
+      appSlug: app.slug,
     });
+
+    const { error: unpublishError } = await supabaseServer
+      .from("apps")
+      .update({
+        published_version_id: null,
+        is_published: false,
+        published_at: null,
+      })
+      .eq("id", app.id);
+
+    if (unpublishError) {
+      return NextResponse.json(
+        { success: false, error: unpublishError.message },
+        { status: 500 },
+      );
+    }
 
     const { error: versionsError } = await supabaseServer
       .from("app_versions")

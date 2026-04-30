@@ -53,13 +53,15 @@ export async function POST(
   { params }: { params: Promise<{ appId: string }> },
 ) {
   const supabaseServer = await createSupabaseServerClient();
+
+  let createdVersionId: string | null = null;
   let uploadedStoragePath: string | null = null;
 
   try {
     const { appId } = await params;
     const body = (await request.json()) as CreateAppVersionRequest;
 
-    if (!body.prompt) {
+    if (!body.prompt?.trim()) {
       return NextResponse.json(
         { success: false, error: "Missing prompt" },
         { status: 400 },
@@ -72,6 +74,8 @@ export async function POST(
         { status: 400 },
       );
     }
+
+    const trimmedPrompt = body.prompt.trim();
 
     const {
       data: { user },
@@ -163,7 +167,7 @@ export async function POST(
       .insert({
         app_id: app.id,
         version_number: nextVersionNumber,
-        prompt: body.prompt,
+        prompt: trimmedPrompt,
         files: body.files,
         storage_path: uploadedStoragePath,
         created_by_user_id: user.id,
@@ -175,6 +179,25 @@ export async function POST(
       throw new Error(versionError?.message ?? "Failed to create app version");
     }
 
+    createdVersionId = version.id;
+
+    const now = new Date().toISOString();
+
+    const { error: updateAppError } = await supabaseServer
+      .from("apps")
+      .update({
+        current_version_id: version.id,
+        status: "draft",
+        updated_at: now,
+      })
+      .eq("id", app.id);
+
+    if (updateAppError) {
+      throw new Error(
+        updateAppError.message ?? "Failed to update app current version",
+      );
+    }
+
     return NextResponse.json({
       success: true,
       appId: app.id,
@@ -184,6 +207,8 @@ export async function POST(
         storagePath: version.storage_path,
         createdAt: version.created_at,
       },
+      currentVersionId: version.id,
+      currentVersionNumber: version.version_number,
     });
   } catch (error) {
     if (uploadedStoragePath) {
@@ -195,6 +220,20 @@ export async function POST(
       } catch (cleanupError) {
         console.error("Failed to clean up uploaded version storage", {
           uploadedStoragePath,
+          cleanupError,
+        });
+      }
+    }
+
+    if (createdVersionId) {
+      try {
+        await supabaseServer
+          .from("app_versions")
+          .delete()
+          .eq("id", createdVersionId);
+      } catch (cleanupError) {
+        console.error("Failed to clean up app version row", {
+          createdVersionId,
           cleanupError,
         });
       }

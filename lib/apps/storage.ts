@@ -348,12 +348,15 @@ export async function deleteSupabaseVersionStorage(params: {
 
 export async function deleteSupabasePublishedAppStorage(params: {
   supabase: SupabaseClient;
-  appId: string;
+  organizationId: string;
+  appSlug: string;
 }) {
+  const publishedStoragePath = `${params.organizationId}/${params.appSlug}`;
+
   const filesToDelete = await listSupabaseStorageFilesRecursively({
     supabase: params.supabase,
     bucket: "published-apps",
-    folderPath: params.appId,
+    folderPath: publishedStoragePath,
   });
 
   if (filesToDelete.length === 0) {

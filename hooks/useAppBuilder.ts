@@ -331,14 +331,6 @@ export function useAppBuilder({
       setPrompt("");
       setHasGeneratedApp(true);
 
-      const restartResult = await restartVitePreview();
-
-      if (!restartResult.ok) {
-        console.warn("[handleSelectApp] Vite restart failed after hydration");
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
       setPreviewKey((key) => key + 1);
       setStatus("success");
       setIsSelectAppOpen(false);
@@ -550,17 +542,6 @@ export function useAppBuilder({
    */
   async function handleReset() {
     await resetGeneratedApp();
-
-    const restartResult = await restartVitePreview();
-
-    if (!restartResult.ok) {
-      console.warn("[handleReset] Vite restart request failed");
-    } else {
-      console.log("[handleReset] restart result", restartResult.data);
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
     clearBuilderState();
     setPreviewKey((key) => key + 1);
   }

@@ -182,7 +182,7 @@ export function AppWorkspacePanel({
 
             {currentAppSlug && (
               <a
-                href={`${publicAppBaseUrl}/apps/${currentAppSlug}`}
+                href={`${publicAppBaseUrl}/published/${currentAppSlug}`}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-10 flex h-24 w-full items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 py-2 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/15"

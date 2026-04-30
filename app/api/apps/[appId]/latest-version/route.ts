@@ -35,10 +35,10 @@ export async function GET(
 
     const {
       data: { user },
-      error: userError,
+      error: authError,
     } = await supabase.auth.getUser();
 
-    if (userError || !user) {
+    if (authError || !user) {
       return NextResponse.json(
         { success: false, error: "Unauthorized" },
         { status: 401 },
@@ -60,7 +60,7 @@ export async function GET(
 
     const { data: app, error: appError } = await supabase
       .from("apps")
-      .select("id, name, slug, organization_id")
+      .select("id, name, slug, organization_id, current_version_id")
       .eq("id", appId)
       .single();
 
@@ -82,31 +82,37 @@ export async function GET(
       );
     }
 
-    const { data: latestVersion, error: versionError } = await supabase
-      .from("app_versions")
-      .select("id, app_id, version_number, storage_path, created_at")
-      .eq("app_id", appId)
-      .order("version_number", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (versionError || !latestVersion) {
+    if (!app.current_version_id) {
       return NextResponse.json(
-        { success: false, error: "No saved version found for this app" },
+        { success: false, error: "App has no current version" },
         { status: 404 },
       );
     }
 
-    if (!latestVersion.storage_path) {
+    const { data: currentVersion, error: versionError } = await supabase
+      .from("app_versions")
+      .select("id, app_id, version_number, storage_path, created_at")
+      .eq("id", app.current_version_id)
+      .eq("app_id", app.id)
+      .maybeSingle();
+
+    if (versionError || !currentVersion) {
       return NextResponse.json(
-        { success: false, error: "Latest version has no storage path" },
+        { success: false, error: "Current app version not found" },
+        { status: 404 },
+      );
+    }
+
+    if (!currentVersion.storage_path) {
+      return NextResponse.json(
+        { success: false, error: "Current version has no storage path" },
         { status: 500 },
       );
     }
 
     const files = await hydrateGeneratedAppFromSupabaseVersion({
       supabase,
-      storagePath: latestVersion.storage_path,
+      storagePath: currentVersion.storage_path,
     });
 
     return NextResponse.json({
@@ -118,10 +124,10 @@ export async function GET(
         organizationId: app.organization_id,
       },
       version: {
-        id: latestVersion.id,
-        versionNumber: latestVersion.version_number,
-        storagePath: latestVersion.storage_path,
-        createdAt: latestVersion.created_at,
+        id: currentVersion.id,
+        versionNumber: currentVersion.version_number,
+        storagePath: currentVersion.storage_path,
+        createdAt: currentVersion.created_at,
       },
       hydratedPath: "generated-app",
       files,
@@ -130,7 +136,7 @@ export async function GET(
     console.error("[latest-version] failed:", error);
 
     return NextResponse.json(
-      { success: false, error: "Failed to load latest app version" },
+      { success: false, error: "Failed to load current app version" },
       { status: 500 },
     );
   }

@@ -145,28 +145,23 @@ export async function hydrateGeneratedAppFromSupabaseVersion(params: {
   storagePath: string;
 }) {
   const targetRoot = generatedAppPath();
+  const targetSrcPath = path.join(targetRoot, "src");
+  const targetPublicPath = path.join(targetRoot, "public");
   const tempRoot = path.join(process.cwd(), "generated-app.__hydrating_tmp");
 
   await fs.rm(tempRoot, { recursive: true, force: true });
   await fs.mkdir(tempRoot, { recursive: true });
 
-  const { data: objects, error: listError } = await params.supabase.storage
-    .from("apps")
-    .list(params.storagePath, {
-      limit: 1000,
-    });
-
-  if (listError) {
-    throw new Error(
-      `Failed to list Supabase Storage files: ${listError.message}`,
-    );
-  }
-
-  if (!objects || objects.length === 0) {
-    throw new Error("No files found in Supabase Storage for this app version");
-  }
-
   const loadedFiles: { path: string }[] = [];
+
+  async function pathExists(targetPath: string) {
+    try {
+      await fs.access(targetPath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
 
   async function downloadFolder(
     storageFolderPath: string,
@@ -218,47 +213,65 @@ export async function hydrateGeneratedAppFromSupabaseVersion(params: {
   }
 
   try {
-    // 1. Download everything into temp folder first.
+    // 1. Download the full saved app version into a temp folder.
     await downloadFolder(params.storagePath, tempRoot);
 
-    // 2. Validate required app files before touching generated-app.
-    for (const requiredFile of [
-      "package.json",
-      "index.html",
-      "src/main.jsx",
-      "src/App.jsx",
-    ]) {
+    const tempSrcPath = path.join(tempRoot, "src");
+    const tempPublicPath = path.join(tempRoot, "public");
+
+    // 2. Validate only the files the live preview actually needs us to hydrate.
+    for (const requiredFile of ["src/main.jsx", "src/App.jsx"]) {
       await fs.access(path.join(tempRoot, requiredFile));
     }
 
-    // 3. Clear generated-app, but preserve node_modules.
-    const existingEntries = await fs.readdir(targetRoot, {
-      withFileTypes: true,
-    });
+    // 3. Ensure the stable preview scaffold exists.
+    await fs.mkdir(targetRoot, { recursive: true });
 
-    await Promise.all(
-      existingEntries
-        .filter((entry) => entry.name !== "node_modules")
-        .map((entry) =>
-          fs.rm(path.join(targetRoot, entry.name), {
-            recursive: true,
-            force: true,
-          }),
-        ),
-    );
-
-    // 4. Copy complete hydrated app into generated-app.
-    await fs.cp(tempRoot, targetRoot, {
+    // 4. Replace only src/.
+    await fs.rm(targetSrcPath, { recursive: true, force: true });
+    await fs.mkdir(path.dirname(targetSrcPath), { recursive: true });
+    await fs.cp(tempSrcPath, targetSrcPath, {
       recursive: true,
       force: true,
     });
 
-    return loadedFiles;
+    // 5. Replace public/ only if the saved version contains it.
+    if (await pathExists(tempPublicPath)) {
+      await fs.rm(targetPublicPath, { recursive: true, force: true });
+      await fs.cp(tempPublicPath, targetPublicPath, {
+        recursive: true,
+        force: true,
+      });
+    }
+
+    // 6. Write the preview marker LAST so Vite gets one clean final signal.
+    const previewMarkerPath = path.join(
+      targetRoot,
+      "src",
+      "__preview_version__.js",
+    );
+
+    const previewMarkerContents = `export const PREVIEW_VERSION = ${JSON.stringify(
+      new Date().toISOString(),
+    )};\n`;
+
+    await fs.writeFile(previewMarkerPath, previewMarkerContents, "utf8");
+
+    const filteredLoadedFiles = loadedFiles.filter(
+      (file) =>
+        file.path === "src" ||
+        file.path.startsWith("src/") ||
+        file.path === "public" ||
+        file.path.startsWith("public/"),
+    );
+
+    filteredLoadedFiles.push({ path: "src/__preview_version__.js" });
+
+    return filteredLoadedFiles.sort((a, b) => a.path.localeCompare(b.path));
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true });
   }
 }
-
 async function listSupabaseStorageFilesRecursively(params: {
   supabase: SupabaseClient;
   bucket: string;

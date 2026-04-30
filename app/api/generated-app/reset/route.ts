@@ -10,6 +10,7 @@ export async function POST() {
   const appPath = path.join(srcPath, "App.jsx");
   const indexCssPath = path.join(srcPath, "index.css");
   const appCssPath = path.join(srcPath, "App.css");
+  const previewVersionPath = path.join(srcPath, "__preview_version__.js");
 
   const appCode = `
 export default function App() {
@@ -44,6 +45,13 @@ body {
 }
 `;
 
+  const previewVersionCode = `export const PREVIEW_VERSION = ${JSON.stringify(
+    new Date().toISOString(),
+  )};
+`;
+
+  await fs.mkdir(srcPath, { recursive: true });
+
   await fs.rm(componentsPath, { recursive: true, force: true });
   await fs.mkdir(componentsPath, { recursive: true });
 
@@ -51,6 +59,9 @@ body {
 
   await fs.writeFile(appPath, appCode.trimStart(), "utf8");
   await fs.writeFile(indexCssPath, cssCode.trimStart(), "utf8");
+
+  // Write this LAST so Vite gets one clean final signal after reset completes.
+  await fs.writeFile(previewVersionPath, previewVersionCode, "utf8");
 
   return NextResponse.json({ success: true });
 }

@@ -18,7 +18,7 @@ type AppWorkspacePanelProps = {
   permissions: AppWorkspacePermissions;
   onCreateOrganization: () => void;
   onSwitchOrganization: () => void | Promise<void>;
-  onClearOrganization: () => void;
+  onClearOrganization?: () => void;
   onSelectApp: () => void | Promise<void>;
   onOpenVersionHistory: () => void;
   onPublishApp: () => void | Promise<void>;
@@ -104,7 +104,7 @@ export function AppWorkspacePanel({
               {(permissions.canCreateOrganization ||
                 permissions.canSwitchOrganization) && (
                 <div className="flex items-center gap-2">
-                  {hasSelectedOrganization && (
+                  {hasSelectedOrganization && onClearOrganization && (
                     <button
                       type="button"
                       onClick={onClearOrganization}

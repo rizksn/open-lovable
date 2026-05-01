@@ -94,6 +94,22 @@ export default function AdminHomePage() {
   const PUBLIC_APP_BASE_URL =
     process.env.NEXT_PUBLIC_APP_BASE_URL ?? "http://localhost:3000";
 
+  function clearScopedWorkspaceContext() {
+    setSelectedTemplateName(null);
+    setCurrentTemplateId(null);
+    builder.setCurrentAppId(null);
+    builder.setCurrentAppSlug(null);
+    builder.setCurrentAppName(null);
+    builder.setApps([]);
+  }
+
+  async function handleClearOrganizationScope() {
+    setSelectedOrganization(null);
+    setSelectedTemplateName(null);
+    setCurrentTemplateId(null);
+    await builder.handleReset();
+  }
+
   /**
    * Loads all organizations the current admin can choose from.
    * Used to populate the organization selector.
@@ -140,14 +156,7 @@ export default function AdminHomePage() {
 
       if (data.organization) {
         setSelectedOrganization(data.organization);
-        setSelectedTemplateName(null);
-        setCurrentTemplateId(null);
-
-        // Clear selected app because apps are scoped to organizations.
-        builder.setCurrentAppId(null);
-        builder.setCurrentAppSlug(null);
-        builder.setCurrentAppName(null);
-        builder.setApps([]);
+        clearScopedWorkspaceContext();
       }
 
       await fetchOrganizations();
@@ -341,6 +350,7 @@ export default function AdminHomePage() {
               await fetchOrganizations();
               setIsSelectOrgOpen(true);
             }}
+            onClearOrganization={handleClearOrganizationScope}
             onSelectApp={builder.fetchAppsForSelectedOrganization}
             onSelectTemplate={fetchTemplates}
             onOpenVersionHistory={builder.handleOpenVersionHistory}
@@ -412,12 +422,7 @@ export default function AdminHomePage() {
           isLoadingOrganizations={isLoadingOrganizations}
           onSelectOrganization={(organization) => {
             setSelectedOrganization(organization);
-            setSelectedTemplateName(null);
-            setCurrentTemplateId(null);
-            builder.setCurrentAppId(null);
-            builder.setCurrentAppSlug(null);
-            builder.setCurrentAppName(null);
-            builder.setApps([]);
+            clearScopedWorkspaceContext();
             setIsSelectOrgOpen(false);
           }}
           onClose={() => setIsSelectOrgOpen(false)}

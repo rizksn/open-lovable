@@ -264,7 +264,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
             No institutions available.
           </div>
         ) : (
-          <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+          <div className="max-h-200 space-y-2 overflow-y-auto pr-1">
             {organizations.map((organization) => (
               <button
                 key={organization.id}

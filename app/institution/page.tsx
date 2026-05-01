@@ -107,6 +107,11 @@ export default function InstitutionPage() {
         return;
       }
 
+      builder.setHistory([]);
+      builder.setPrompt("");
+      builder.setErrorMessage(null);
+      builder.setLastFilesWritten([]);
+
       builder.setCurrentAppId(null);
       builder.setCurrentAppSlug(null);
       builder.setCurrentAppName(null);

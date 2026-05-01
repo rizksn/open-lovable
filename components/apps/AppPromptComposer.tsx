@@ -39,7 +39,7 @@ export function AppPromptComposer({
         <button
           type="button"
           onClick={() => onOpenSaveModal?.()}
-          className="ml-6 mt-3 block h-24 w-full rounded-lg bg-cyan-300 pl-20 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
+          className="mx-4 mt-4 block h-24 w-auto rounded-lg bg-cyan-300 pl-20 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-300/10 transition hover:bg-cyan-200"
         >
           {currentAppId ? "Save new version" : "Save app"}
         </button>
@@ -49,7 +49,7 @@ export function AppPromptComposer({
         <button
           type="button"
           onClick={() => onOpenSaveTemplateModal?.()}
-          className="ml-6 mt-3 block h-24 w-full rounded-lg border border-emerald-400/30 bg-emerald-400/10 pl-20 text-sm font-bold text-emerald-200 shadow-lg shadow-emerald-400/10 transition hover:bg-emerald-400/15"
+          className="mx-4 mt-4 block h-24 w-auto rounded-lg border border-emerald-400/30 bg-emerald-400/10 pl-20 text-sm font-bold text-emerald-200 shadow-lg shadow-emerald-400/10 transition hover:bg-emerald-400/15"
         >
           Save template
         </button>

@@ -41,7 +41,9 @@ type UseAppBuilderReturn = {
   previewKey: number;
   setPreviewKey: Dispatch<SetStateAction<number>>;
   history: HistoryItem[];
+  setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
   lastFilesWritten: string[];
+  setLastFilesWritten: React.Dispatch<React.SetStateAction<string[]>>;
   latestPrompt: string;
   errorMessage: string | null;
   setErrorMessage: Dispatch<SetStateAction<string | null>>;
@@ -570,7 +572,9 @@ export function useAppBuilder({
     previewKey,
     setPreviewKey,
     history,
+    setHistory,
     lastFilesWritten,
+    setLastFilesWritten,
     latestPrompt,
     errorMessage,
     setErrorMessage,

@@ -241,6 +241,11 @@ export default function AdminHomePage() {
         return;
       }
 
+      builder.setHistory([]);
+      builder.setPrompt("");
+      builder.setErrorMessage(null);
+      builder.setLastFilesWritten([]);
+
       if (template.visibility === "organization" && template.organization) {
         setSelectedOrganization(template.organization);
       }

@@ -22,9 +22,12 @@ import { useAppBuilder } from "@/hooks/useAppBuilder";
 
 import { getOrganizationById } from "@/lib/organizations/client";
 import { getTemplates, loadTemplate } from "@/lib/templates/client";
+import { resetGeneratedApp } from "@/lib/apps/client";
 
 import type { AppWorkspacePermissions } from "@/types/app";
 import type { Organization } from "@/types/organizations";
+
+type TemplateVisibility = "public" | "organization";
 
 export default function InstitutionPage() {
   const { user } = useAuth();
@@ -45,6 +48,8 @@ export default function InstitutionPage() {
   const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(
     null,
   );
+  const [currentTemplateVisibility, setCurrentTemplateVisibility] =
+    useState<TemplateVisibility>("public");
 
   /* Select template modal state */
   const [isSelectTemplateOpen, setIsSelectTemplateOpen] = useState(false);
@@ -65,7 +70,6 @@ export default function InstitutionPage() {
   const PUBLIC_APP_BASE_URL =
     process.env.NEXT_PUBLIC_APP_BASE_URL ?? "http://localhost:3000";
 
-  const isViewer = user?.role === "viewer";
   const canPersist = user?.role === "editor" || user?.role === "platform_admin";
 
   const workspacePermissions: AppWorkspacePermissions = {
@@ -129,6 +133,7 @@ export default function InstitutionPage() {
 
       setSelectedTemplateName(template.name);
       setCurrentTemplateId(template.id);
+      setCurrentTemplateVisibility(template.visibility);
       setIsSelectTemplateOpen(false);
     } catch (error) {
       setSelectTemplateError(
@@ -137,6 +142,17 @@ export default function InstitutionPage() {
       builder.setStatus("error");
     } finally {
       setIsLoadingSelectedTemplate(false);
+    }
+  }
+
+  async function handleSaveAppFromInstitution() {
+    const wasInTemplateContext = Boolean(currentTemplateId);
+    const didSave = await builder.handleSaveApp();
+
+    if (wasInTemplateContext && didSave) {
+      setCurrentTemplateId(null);
+      setSelectedTemplateName(null);
+      setCurrentTemplateVisibility("public");
     }
   }
 
@@ -179,9 +195,11 @@ export default function InstitutionPage() {
   useEffect(() => {
     async function resetOnLogout() {
       if (!user) {
+        await resetGeneratedApp();
         clearBuilderState();
         setCurrentTemplateId(null);
         setSelectedTemplateName(null);
+        setCurrentTemplateVisibility("public");
       }
     }
 
@@ -253,6 +271,7 @@ export default function InstitutionPage() {
               await builder.handleReset();
               setSelectedTemplateName(null);
               setCurrentTemplateId(null);
+              setCurrentTemplateVisibility("public");
             }}
           />
         </aside>
@@ -271,7 +290,7 @@ export default function InstitutionPage() {
             builder.setSaveAppError(null);
             builder.setIsSaveAppOpen(false);
           }}
-          onSave={builder.handleSaveApp}
+          onSave={handleSaveAppFromInstitution}
         />
 
         <SelectAppModal
@@ -282,6 +301,7 @@ export default function InstitutionPage() {
           isLoadingSelectedApp={builder.isLoadingSelectedApp}
           onSelectApp={async (app) => {
             setCurrentTemplateId(null);
+            setCurrentTemplateVisibility("public");
             await builder.handleSelectApp(app);
             setSelectedTemplateName(null);
           }}

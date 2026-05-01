@@ -28,20 +28,20 @@ export default function HomePage() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3 shadow-lg shadow-black/20">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
+                <p className="text-[11px] ml-10 mt-6 font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
                   Public Sandbox
                 </p>
-                <h2 className="mt-1 text-sm font-semibold text-slate-100">
+                <h2 className="mt-6 ml-10 text-sm font-semibold text-slate-100">
                   Try the OutRival app builder
                 </h2>
               </div>
 
-              <div className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              <div className="rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1 mb-16 mr-6 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 {mode}
               </div>
             </div>
 
-            <p className="text-xs leading-relaxed text-slate-400">
+            <p className="text-xs mb-10 ml-10 leading-relaxed text-slate-400">
               Generate and refine an app in the live preview. This public view
               is intentionally limited to builder experimentation only.
             </p>

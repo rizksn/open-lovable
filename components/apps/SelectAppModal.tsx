@@ -1,4 +1,4 @@
-type AppSummary = {
+export type AppSummary = {
   id: string;
   name: string;
   slug: string;

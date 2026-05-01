@@ -23,7 +23,6 @@ import {
   resetGeneratedApp,
   saveApp,
   saveAppVersion,
-  restartVitePreview,
 } from "@/lib/apps/client";
 
 type UseAppBuilderArgs = {

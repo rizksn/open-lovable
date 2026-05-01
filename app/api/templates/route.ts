@@ -8,7 +8,8 @@ import {
 
 type TemplateVisibility = "public" | "organization";
 
-type CreateTemplateRequest = {
+type SaveTemplateRequest = {
+  templateId?: string | null;
   name: string;
   visibility: TemplateVisibility;
   organizationId?: string | null;
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
   let uploadedStoragePath: string | null = null;
 
   try {
-    const body = (await request.json()) as CreateTemplateRequest;
+    const body = (await request.json()) as SaveTemplateRequest;
 
     const trimmedName = body.name?.trim();
 
@@ -117,33 +118,83 @@ export async function POST(request: Request) {
       }
     }
 
-    const templateId = crypto.randomUUID();
-    const slug = createSlug(trimmedName);
+    let templateId: string;
+    let slug: string;
+
+    if (body.templateId) {
+      const { data: existingTemplate, error: existingTemplateError } =
+        await supabaseServer
+          .from("templates")
+          .select("id, slug")
+          .eq("id", body.templateId)
+          .single();
+
+      if (existingTemplateError || !existingTemplate) {
+        return NextResponse.json(
+          { success: false, error: "Template not found" },
+          { status: 404 },
+        );
+      }
+
+      templateId = existingTemplate.id;
+      slug = existingTemplate.slug;
+    } else {
+      templateId = crypto.randomUUID();
+      slug = createSlug(trimmedName);
+      createdTemplateId = templateId;
+    }
+
     const storagePath = templateStoragePath({ templateId });
     const now = new Date().toISOString();
 
-    const { data: template, error: templateError } = await supabaseServer
-      .from("templates")
-      .insert({
-        id: templateId,
-        name: trimmedName,
-        slug,
-        visibility: body.visibility,
-        organization_id:
-          body.visibility === "organization" ? body.organizationId : null,
-        created_by_user_id: user.id,
-        storage_path: storagePath,
-        created_at: now,
-        updated_at: now,
-      })
-      .select("id, name, slug, visibility, organization_id, storage_path")
-      .single();
+    let template;
 
-    if (templateError || !template) {
-      throw new Error(templateError?.message ?? "Failed to create template");
+    if (body.templateId) {
+      const { data: updatedTemplate, error: templateError } =
+        await supabaseServer
+          .from("templates")
+          .update({
+            name: trimmedName,
+            visibility: body.visibility,
+            organization_id:
+              body.visibility === "organization" ? body.organizationId : null,
+            storage_path: storagePath,
+            updated_at: now,
+          })
+          .eq("id", templateId)
+          .select("id, name, slug, visibility, organization_id, storage_path")
+          .single();
+
+      if (templateError || !updatedTemplate) {
+        throw new Error(templateError?.message ?? "Failed to update template");
+      }
+
+      template = updatedTemplate;
+    } else {
+      const { data: createdTemplate, error: templateError } =
+        await supabaseServer
+          .from("templates")
+          .insert({
+            id: templateId,
+            name: trimmedName,
+            slug,
+            visibility: body.visibility,
+            organization_id:
+              body.visibility === "organization" ? body.organizationId : null,
+            created_by_user_id: user.id,
+            storage_path: storagePath,
+            created_at: now,
+            updated_at: now,
+          })
+          .select("id, name, slug, visibility, organization_id, storage_path")
+          .single();
+
+      if (templateError || !createdTemplate) {
+        throw new Error(templateError?.message ?? "Failed to create template");
+      }
+
+      template = createdTemplate;
     }
-
-    createdTemplateId = template.id;
 
     uploadedStoragePath = await uploadGeneratedAppToSupabaseTemplate({
       supabase: supabaseServer,
@@ -192,7 +243,7 @@ export async function POST(request: Request) {
       }
     }
 
-    console.error("[create-template-save] failed:", error);
+    console.error("[save-template] failed:", error);
 
     return NextResponse.json(
       {

@@ -12,7 +12,7 @@ import { AppWorkspacePanel } from "@/components/apps/AppWorkspacePanel";
 import { DeleteAppModal } from "@/components/apps/DeleteAppModal";
 import { SaveAppModal } from "@/components/apps/SaveAppModal";
 import { SaveTemplateModal } from "@/components/apps/SaveTemplateModal";
-import { SelectAppModal } from "@/components/apps/SelectAppModal";
+import { SelectAppModal, AppSummary } from "@/components/apps/SelectAppModal";
 import {
   SelectTemplateModal,
   type TemplateSummary,
@@ -57,6 +57,9 @@ export default function AdminHomePage() {
   const [selectedTemplateName, setSelectedTemplateName] = useState<
     string | null
   >(null);
+  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(
+    null,
+  );
 
   /* Save template modal state */
   const [isSaveTemplateOpen, setIsSaveTemplateOpen] = useState(false);
@@ -137,6 +140,8 @@ export default function AdminHomePage() {
 
       if (data.organization) {
         setSelectedOrganization(data.organization);
+        setSelectedTemplateName(null);
+        setCurrentTemplateId(null);
 
         // Clear selected app because apps are scoped to organizations.
         builder.setCurrentAppId(null);
@@ -176,6 +181,7 @@ export default function AdminHomePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          templateId: currentTemplateId,
           name: templateName.trim(),
           visibility: templateVisibility,
           organizationId:
@@ -191,6 +197,8 @@ export default function AdminHomePage() {
         setSaveTemplateError(data.error ?? "Failed to save template.");
         return;
       }
+
+      setCurrentTemplateId(data.templateId);
       setSelectedTemplateName(templateName.trim());
 
       setTemplateName("");
@@ -238,17 +246,25 @@ export default function AdminHomePage() {
 
       if (!ok || !data.success) {
         setSelectTemplateError(data.error ?? "Failed to load template.");
+        builder.setStatus("error");
         return;
       }
 
       builder.setHistory([]);
       builder.setPrompt("");
       builder.setErrorMessage(null);
-      builder.setLastFilesWritten([]);
+      builder.setLastFilesWritten(
+        Array.isArray(data.files)
+          ? data.files.map((file: { path: string }) => file.path)
+          : [],
+      );
 
       if (template.visibility === "organization" && template.organization) {
         setSelectedOrganization(template.organization);
       }
+
+      setSelectedTemplateName(template.name);
+      setCurrentTemplateId(template.id);
 
       builder.setCurrentAppId(null);
       builder.setCurrentAppSlug(null);
@@ -256,13 +272,13 @@ export default function AdminHomePage() {
       builder.setHasGeneratedApp(true);
       builder.setStatus("success");
       builder.setPreviewKey((key) => key + 1);
-      setSelectedTemplateName(template.name);
 
       setIsSelectTemplateOpen(false);
     } catch (error) {
       setSelectTemplateError(
         error instanceof Error ? error.message : "Failed to load template.",
       );
+      builder.setStatus("error");
     } finally {
       setIsLoadingSelectedTemplate(false);
     }
@@ -368,6 +384,7 @@ export default function AdminHomePage() {
             onReset={async () => {
               await builder.handleReset();
               setSelectedTemplateName(null);
+              setCurrentTemplateId(null);
             }}
           />
         </aside>
@@ -396,6 +413,7 @@ export default function AdminHomePage() {
           onSelectOrganization={(organization) => {
             setSelectedOrganization(organization);
             setSelectedTemplateName(null);
+            setCurrentTemplateId(null);
             builder.setCurrentAppId(null);
             builder.setCurrentAppSlug(null);
             builder.setCurrentAppName(null);
@@ -434,7 +452,6 @@ export default function AdminHomePage() {
           onVisibilityChange={setTemplateVisibility}
           onClose={() => {
             setTemplateName(selectedTemplateName ?? "");
-            setTemplateVisibility("public");
             setSaveTemplateError(null);
             setIsSaveTemplateOpen(false);
           }}
@@ -448,6 +465,7 @@ export default function AdminHomePage() {
           selectAppError={builder.selectAppError}
           isLoadingSelectedApp={builder.isLoadingSelectedApp}
           onSelectApp={async (app) => {
+            setCurrentTemplateId(null);
             await builder.handleSelectApp(app);
             setSelectedTemplateName(null);
           }}

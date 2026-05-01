@@ -203,12 +203,12 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
 
   function renderRootStep() {
     return (
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 p-30 space-y-3">
         <button
           type="button"
           onClick={handlePlatformAdminLogin}
           disabled={isSubmitting}
-          className="w-full rounded-xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full mb-20 rounded-lg bg-cyan-400 px-20 py-3 text-sm font-semibold text-black transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Continue as OutRival Admin
         </button>
@@ -217,7 +217,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
           type="button"
           onClick={handleContinueAsInstitutionUser}
           disabled={isSubmitting}
-          className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          className="w-full rounded-lg border border-white/10 bg-white/5 px-20 py-3 text-sm font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
         >
           Continue as Institution User
         </button>
@@ -351,7 +351,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
         className="w-full max-w-md rounded-2xl border border-white/10 bg-neutral-950 p-6 text-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 className="text-xl font-semibold">{stepTitle}</h2>
+        <h2 className="text-xl mt-20 ml-20 font-semibold">{stepTitle}</h2>
 
         {step === "root" && renderRootStep()}
         {step === "institution" && renderInstitutionStep()}
@@ -367,7 +367,7 @@ export function LoginModal({ open, onClose }: LoginModalProps) {
           type="button"
           onClick={handleClose}
           disabled={isSubmitting}
-          className="mt-5 w-full text-sm text-white/50 transition hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-10 h-28 w-full rounded-xl border border-white/10 bg-yellow-500/50 px-16 text-sm font-bold text-slate-300 transition hover:bg-white/[0.1]"
         >
           Cancel
         </button>

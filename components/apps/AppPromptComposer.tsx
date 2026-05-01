@@ -79,9 +79,9 @@ export function AppPromptComposer({
           />
 
           {errorMessage && (
-            <div className="mt-3 rounded-xl border border-red-300/20 bg-red-400/[0.08] p-3">
+            <div className="mt-3 mb-4 rounded-lg border border-red-300/20 bg-red-400/[0.08] p-3">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold text-red-100">
+                <p className="text-xs mt-4 mb-6 font-bold text-red-100">
                   Generation failed
                 </p>
 
@@ -94,7 +94,7 @@ export function AppPromptComposer({
                 </button>
               </div>
 
-              <pre className="mt-2 max-h-20 overflow-auto whitespace-pre-wrap rounded-lg bg-black/35 p-2.5 font-mono text-[11px] leading-relaxed text-red-100/75">
+              <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-black/35 p-2.5 font-mono text-[11px] leading-relaxed text-red-100/75">
                 {errorMessage}
               </pre>
             </div>

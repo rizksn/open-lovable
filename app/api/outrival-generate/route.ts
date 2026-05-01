@@ -14,6 +14,12 @@ type GeneratedFile = {
   content: string;
 };
 
+type UnsafeMatch = {
+  path: string;
+  rule: string;
+  snippet: string;
+};
+
 const execAsync = promisify(exec);
 
 /**
@@ -172,6 +178,48 @@ function isWritableGeneratedFile(filePath: string) {
     normalizedPath.endsWith(".js") ||
     normalizedPath.endsWith(".css")
   );
+}
+
+function scanFilesForUnsafePatterns(files: GeneratedFile[]) {
+  const unsafeRules = [
+    { rule: "eval()", regex: /\beval\s*\(/ },
+    { rule: "new Function()", regex: /\bnew\s+Function\s*\(/ },
+    { rule: "Function()", regex: /\bFunction\s*\(/ },
+    { rule: "dangerouslySetInnerHTML", regex: /dangerouslySetInnerHTML/ },
+    { rule: "document.write()", regex: /document\.write\s*\(/ },
+    { rule: "innerHTML assignment", regex: /\.innerHTML\s*=/ },
+    { rule: "outerHTML assignment", regex: /\.outerHTML\s*=/ },
+    { rule: "insertAdjacentHTML()", regex: /insertAdjacentHTML\s*\(/ },
+    { rule: "string setTimeout()", regex: /setTimeout\s*\(\s*["'`]/ },
+    { rule: "string setInterval()", regex: /setInterval\s*\(\s*["'`]/ },
+  ];
+
+  const matches: UnsafeMatch[] = [];
+
+  for (const file of files) {
+    for (const unsafeRule of unsafeRules) {
+      const match = file.content.match(unsafeRule.regex);
+
+      if (!match) continue;
+
+      const index = match.index ?? 0;
+      const snippet = file.content.slice(
+        Math.max(0, index - 80),
+        Math.min(file.content.length, index + 120),
+      );
+
+      matches.push({
+        path: file.path,
+        rule: unsafeRule.rule,
+        snippet,
+      });
+    }
+  }
+
+  return {
+    isSafe: matches.length === 0,
+    matches,
+  };
 }
 
 /**
@@ -484,6 +532,27 @@ Important constraints:
         generatedFiles: files.map((file) => file.path),
       },
       { status: 500 },
+    );
+  }
+
+  const unsafeScan = scanFilesForUnsafePatterns(writableFiles);
+
+  if (!unsafeScan.isSafe) {
+    console.warn("[outrival-generate] rejected unsafe generated code", {
+      matches: unsafeScan.matches,
+    });
+
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Generated code was rejected because it used unsafe patterns like eval() or raw HTML injection.",
+        unsafeMatches: unsafeScan.matches.map((match) => ({
+          path: match.path,
+          rule: match.rule,
+        })),
+      },
+      { status: 400 },
     );
   }
 

@@ -33,6 +33,8 @@ import { getTemplates, loadTemplate } from "@/lib/templates/client";
 import type { AppWorkspacePermissions } from "@/types/app";
 import type { Organization } from "@/types/organizations";
 
+type TemplateVisibility = "public" | "organization";
+
 export default function AdminHomePage() {
   const { user } = useAuth();
 
@@ -80,6 +82,8 @@ export default function AdminHomePage() {
   const [selectTemplateError, setSelectTemplateError] = useState<string | null>(
     null,
   );
+  const [currentTemplateVisibility, setCurrentTemplateVisibility] =
+    useState<TemplateVisibility>("public");
 
   const builder = useAppBuilder({
     user,
@@ -94,19 +98,18 @@ export default function AdminHomePage() {
   const PUBLIC_APP_BASE_URL =
     process.env.NEXT_PUBLIC_APP_BASE_URL ?? "http://localhost:3000";
 
-  function clearScopedWorkspaceContext() {
+  async function clearScopedWorkspaceContext() {
     setSelectedTemplateName(null);
     setCurrentTemplateId(null);
-    builder.setCurrentAppId(null);
-    builder.setCurrentAppSlug(null);
-    builder.setCurrentAppName(null);
-    builder.setApps([]);
+    setCurrentTemplateVisibility("public");
+    await builder.handleReset();
   }
 
   async function handleClearOrganizationScope() {
     setSelectedOrganization(null);
     setSelectedTemplateName(null);
     setCurrentTemplateId(null);
+    setCurrentTemplateVisibility("public");
     await builder.handleReset();
   }
 
@@ -211,7 +214,7 @@ export default function AdminHomePage() {
       setSelectedTemplateName(templateName.trim());
 
       setTemplateName("");
-      setTemplateVisibility("public");
+      setCurrentTemplateVisibility(templateVisibility);
       setSaveTemplateError(null);
       setIsSaveTemplateOpen(false);
     } catch (error) {
@@ -220,6 +223,17 @@ export default function AdminHomePage() {
       );
     } finally {
       setIsSavingTemplate(false);
+    }
+  }
+
+  async function handleSaveAppFromAdmin() {
+    const wasInTemplateContext = Boolean(currentTemplateId);
+    const didSave = await builder.handleSaveApp();
+
+    if (wasInTemplateContext && didSave) {
+      setCurrentTemplateId(null);
+      setSelectedTemplateName(null);
+      setCurrentTemplateVisibility("public");
     }
   }
 
@@ -274,6 +288,7 @@ export default function AdminHomePage() {
 
       setSelectedTemplateName(template.name);
       setCurrentTemplateId(template.id);
+      setCurrentTemplateVisibility(template.visibility);
 
       builder.setCurrentAppId(null);
       builder.setCurrentAppSlug(null);
@@ -372,7 +387,7 @@ export default function AdminHomePage() {
           <AppPromptComposer
             isAuthenticated={Boolean(user)}
             canSave={isPlatformAdmin && hasSelectedOrganization}
-            canSaveTemplate={isPlatformAdmin}
+            canSaveTemplate={isPlatformAdmin && !builder.currentAppId}
             currentAppId={builder.currentAppId}
             mode={mode}
             prompt={builder.prompt}
@@ -386,7 +401,15 @@ export default function AdminHomePage() {
             onOpenSaveTemplateModal={() => {
               setSaveTemplateError(null);
               setTemplateName(selectedTemplateName ?? "");
-              setTemplateVisibility("public");
+
+              if (currentTemplateId) {
+                setTemplateVisibility(currentTemplateVisibility);
+              } else if (selectedOrganization) {
+                setTemplateVisibility("organization");
+              } else {
+                setTemplateVisibility("public");
+              }
+
               setIsSaveTemplateOpen(true);
             }}
             onPromptChange={builder.setPrompt}
@@ -395,6 +418,7 @@ export default function AdminHomePage() {
               await builder.handleReset();
               setSelectedTemplateName(null);
               setCurrentTemplateId(null);
+              setCurrentTemplateVisibility("public");
             }}
           />
         </aside>
@@ -442,7 +466,7 @@ export default function AdminHomePage() {
             builder.setSaveAppError(null);
             builder.setIsSaveAppOpen(false);
           }}
-          onSave={builder.handleSaveApp}
+          onSave={handleSaveAppFromAdmin}
         />
 
         <SaveTemplateModal
@@ -471,6 +495,7 @@ export default function AdminHomePage() {
           isLoadingSelectedApp={builder.isLoadingSelectedApp}
           onSelectApp={async (app) => {
             setCurrentTemplateId(null);
+            setCurrentTemplateVisibility("public");
             await builder.handleSelectApp(app);
             setSelectedTemplateName(null);
           }}

@@ -42,6 +42,9 @@ export default function InstitutionPage() {
   const [selectedTemplateName, setSelectedTemplateName] = useState<
     string | null
   >(null);
+  const [currentTemplateId, setCurrentTemplateId] = useState<string | null>(
+    null,
+  );
 
   /* Select template modal state */
   const [isSelectTemplateOpen, setIsSelectTemplateOpen] = useState(false);
@@ -104,13 +107,18 @@ export default function InstitutionPage() {
 
       if (!ok || !data.success) {
         setSelectTemplateError(data.error ?? "Failed to load template.");
+        builder.setStatus("error");
         return;
       }
 
       builder.setHistory([]);
       builder.setPrompt("");
       builder.setErrorMessage(null);
-      builder.setLastFilesWritten([]);
+      builder.setLastFilesWritten(
+        Array.isArray(data.files)
+          ? data.files.map((file: { path: string }) => file.path)
+          : [],
+      );
 
       builder.setCurrentAppId(null);
       builder.setCurrentAppSlug(null);
@@ -120,11 +128,13 @@ export default function InstitutionPage() {
       builder.setPreviewKey((key) => key + 1);
 
       setSelectedTemplateName(template.name);
+      setCurrentTemplateId(template.id);
       setIsSelectTemplateOpen(false);
     } catch (error) {
       setSelectTemplateError(
         error instanceof Error ? error.message : "Failed to load template.",
       );
+      builder.setStatus("error");
     } finally {
       setIsLoadingSelectedTemplate(false);
     }
@@ -170,6 +180,7 @@ export default function InstitutionPage() {
     async function resetOnLogout() {
       if (!user) {
         clearBuilderState();
+        setCurrentTemplateId(null);
         setSelectedTemplateName(null);
       }
     }
@@ -241,6 +252,7 @@ export default function InstitutionPage() {
             onReset={async () => {
               await builder.handleReset();
               setSelectedTemplateName(null);
+              setCurrentTemplateId(null);
             }}
           />
         </aside>
@@ -269,6 +281,7 @@ export default function InstitutionPage() {
           selectAppError={builder.selectAppError}
           isLoadingSelectedApp={builder.isLoadingSelectedApp}
           onSelectApp={async (app) => {
+            setCurrentTemplateId(null);
             await builder.handleSelectApp(app);
             setSelectedTemplateName(null);
           }}

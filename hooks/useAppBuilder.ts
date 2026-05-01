@@ -92,7 +92,7 @@ type UseAppBuilderReturn = {
 
   /* Shared handlers */
   handleGenerate: () => Promise<void>;
-  handleSaveApp: () => Promise<void>;
+  handleSaveApp: () => Promise<boolean>;
   handleSelectApp: (app: AppSummary) => Promise<void>;
   handleOpenVersionHistory: () => Promise<void>;
   handleLoadVersion: (versionNumber: number) => Promise<void>;
@@ -230,8 +230,8 @@ export function useAppBuilder({
    * If this is an existing app, the backend creates a new app_versions row
    * and snapshots generated-app as the next version.
    */
-  async function handleSaveApp() {
-    if (!user) return;
+  async function handleSaveApp(): Promise<boolean> {
+    if (!user) return false;
 
     const promptToSave =
       latestPrompt || prompt || `Saved version of ${currentAppName ?? "app"}`;
@@ -248,24 +248,24 @@ export function useAppBuilder({
 
         if (!data.success) {
           setSaveAppError(data.error ?? "Failed to save app version.");
-          return;
+          return false;
         }
 
         setIsSaveAppOpen(false);
         setAppName("");
         setSaveAppError(null);
         setStatus("success");
-        return;
+        return true;
       }
 
       if (!selectedOrganization) {
         alert("Please select an organization before saving an app.");
-        return;
+        return false;
       }
 
       if (!appName.trim()) {
         setSaveAppError("App name is required.");
-        return;
+        return false;
       }
 
       const trimmedAppName = appName.trim();
@@ -279,7 +279,7 @@ export function useAppBuilder({
 
       if (!data.success) {
         setSaveAppError(data.error ?? "Failed to save app.");
-        return;
+        return false;
       }
 
       setCurrentAppId(data.appId);
@@ -290,10 +290,12 @@ export function useAppBuilder({
       setAppName("");
       setSaveAppError(null);
       setStatus("success");
+      return true;
     } catch (error) {
       setSaveAppError(
         error instanceof Error ? error.message : "Failed to save app.",
       );
+      return false;
     } finally {
       setIsSavingApp(false);
     }

@@ -39,7 +39,7 @@ export function FinancialAidCalculator() {
         <header className="mb-8 flex flex-col gap-5 rounded-3xl border border-white/10 bg-white/[0.04] p-6 shadow-2xl shadow-black/20 backdrop-blur md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">
-              OutRival Template Demo
+              OUTRIVAL TEMPLATE
             </p>
             <h1 className="mt-3 max-w-3xl text-3xl font-bold tracking-tight text-white md:text-5xl">
               Financial Aid Estimator

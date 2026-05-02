@@ -65,12 +65,57 @@ function extractFiles(generatedCode: string): GeneratedFile[] {
   const editRegex =
     /<edit target_file="([^"]+)">[\s\S]*?<update>([\s\S]*?)<\/update>[\s\S]*?<\/edit>/g;
 
+  function looksLikeCompleteSourceFile(filePath: string, content: string) {
+    const normalizedPath = normalizeGeneratedFilePath(filePath);
+    const trimmedContent = content.trim();
+
+    if (!trimmedContent) return false;
+
+    if (trimmedContent.startsWith("<")) {
+      return false;
+    }
+
+    if (normalizedPath.endsWith(".css")) {
+      return true;
+    }
+
+    if (normalizedPath.endsWith(".ts") && !normalizedPath.endsWith(".tsx")) {
+      return /\bexport\b/.test(trimmedContent);
+    }
+
+    if (
+      normalizedPath.endsWith(".tsx") ||
+      normalizedPath.endsWith(".jsx") ||
+      normalizedPath.endsWith(".js")
+    ) {
+      const hasExport = /\bexport\b/.test(trimmedContent);
+      const hasRenderableReactShape =
+        trimmedContent.includes("return (") ||
+        trimmedContent.includes("return <") ||
+        trimmedContent.includes("=> (") ||
+        trimmedContent.includes("=> <");
+
+      return hasExport && hasRenderableReactShape;
+    }
+
+    return false;
+  }
+
   let fileMatch;
   while ((fileMatch = fileRegex.exec(generatedCode)) !== null) {
-    files.push({
-      path: fileMatch[1],
-      content: fileMatch[2].trim(),
-    });
+    const path = fileMatch[1];
+    const content = fileMatch[2].trim();
+
+    if (!looksLikeCompleteSourceFile(path, content)) {
+      console.warn("[outrival-generate] skipped incomplete file block", {
+        path,
+        preview: content.slice(0, 200),
+      });
+
+      continue;
+    }
+
+    files.push({ path, content });
   }
 
   let editMatch;
@@ -78,13 +123,7 @@ function extractFiles(generatedCode: string): GeneratedFile[] {
     const path = editMatch[1];
     const content = editMatch[2].trim();
 
-    const looksLikeCompleteFile =
-      content.includes("export default") &&
-      (content.includes("function") ||
-        content.includes("const") ||
-        content.includes("=>"));
-
-    if (!looksLikeCompleteFile) {
+    if (!looksLikeCompleteSourceFile(path, content)) {
       console.warn("[outrival-generate] skipped partial edit block", {
         path,
         preview: content.slice(0, 200),
@@ -93,10 +132,7 @@ function extractFiles(generatedCode: string): GeneratedFile[] {
       continue;
     }
 
-    files.push({
-      path,
-      content,
-    });
+    files.push({ path, content });
   }
 
   return files;
@@ -176,6 +212,8 @@ function isWritableGeneratedFile(filePath: string) {
   return (
     normalizedPath.endsWith(".jsx") ||
     normalizedPath.endsWith(".js") ||
+    normalizedPath.endsWith(".tsx") ||
+    normalizedPath.endsWith(".ts") ||
     normalizedPath.endsWith(".css")
   );
 }
@@ -357,6 +395,36 @@ export default defineConfig({
   await fs.writeFile(viteConfigPath, viteConfig, "utf8");
 }
 
+async function ensureTailwindImport() {
+  const indexCssPath = path.join(generatedAppRoot(), "src", "index.css");
+
+  let content = "";
+
+  try {
+    content = await fs.readFile(indexCssPath, "utf8");
+  } catch {
+    content = "";
+  }
+
+  const hasTailwindImport =
+    content.includes('@import "tailwindcss";') ||
+    content.includes("@import 'tailwindcss';");
+
+  if (!hasTailwindImport) {
+    await fs.mkdir(path.dirname(indexCssPath), { recursive: true });
+    await fs.writeFile(
+      indexCssPath,
+      `@import "tailwindcss";\n\n${content}`,
+      "utf8",
+    );
+  }
+}
+
+async function ensureGeneratedAppScaffold() {
+  await ensureTailwindImport();
+  await ensureViteRelativeBase();
+}
+
 /**
  * Main generation endpoint.
  *
@@ -411,17 +479,22 @@ Critical edit rules:
 - If the request requires global styles, animations, or custom CSS not practical with Tailwind, update src/index.css.
 - The generated app is configured for Tailwind CSS.
 - Use Tailwind utility classes for layout, spacing, typography, colors, responsive behavior, hover states, shadows, rounded surfaces, and polished product UI.
-- Do NOT use external packages.
 - Use plain React state only.
+- Do NOT use external packages.
+- Do NOT use eval(), Function(), dangerouslySetInnerHTML, or dynamic code execution.
+- Do NOT generate index.html, package.json, vite.config.js, or src/main.jsx.
+- Only generate source files under src/.
+- Allowed file types are .js, .jsx, .ts, .tsx, and .css.
+- You may generate JavaScript/TypeScript React files under src/ using .js, .jsx, .ts, or .tsx extensions.
+- Do NOT generate image files or binary assets, including png, jpg, jpeg, gif, webp, or svg files.
+- Do NOT reference local image paths unless the file already exists in the provided project context.
+- Use Tailwind gradients, CSS shapes, inline SVG inside JSX, emoji, or text-based visuals instead of external image assets.
 - Return ONLY the full contents of files that changed.
 - Each returned file must be complete from first line to last line.
+- Return files using <file path="...">...</file> blocks only.
 - Do NOT return partial snippets.
 - Do NOT wrap file contents in markdown fences like \`\`\`javascript.
 - Do NOT include explanations outside the <file> blocks.
-- Do NOT generate index.html, package.json, vite.config.js, or src/main.jsx.
-- Do NOT use eval(), Function(), dangerouslySetInnerHTML, or dynamic code execution.
-- Only generate files under src/.
-- Return files using <file path="...">...</file> blocks only.
 - Always return complete files, not partial snippets. Even for edits, return the full updated file content.
 `
     : `
@@ -438,15 +511,20 @@ Important constraints:
 - Use Tailwind utility classes to create a polished, modern product UI by default.
 - Use strong layout, spacing, typography, color, responsive behavior, hover states, shadows, rounded surfaces, and clear visual hierarchy.
 - You may use src/index.css for global resets, custom animations, or styles that are awkward to express with Tailwind utilities.
-- Only generate files under src/.
-- Do NOT generate index.html, package.json, vite.config.js, or src/main.jsx.
-- Do NOT use external packages.
 - Use plain React state only.
+- Do NOT use external packages.
+- Do NOT use eval(), Function(), dangerouslySetInnerHTML, or dynamic code execution.
+- Do NOT generate index.html, package.json, vite.config.js, or src/main.jsx.
+- Only generate source files under src/.
+- Allowed file types are .js, .jsx, .ts, .tsx, and .css.
+- You may generate JavaScript/TypeScript React files under src/ using .js, .jsx, .ts, or .tsx extensions.
+- Do NOT generate image files or binary assets, including png, jpg, jpeg, gif, webp, or svg files.
+- Do NOT reference local image paths unless the file already exists in the provided project context.
+- Use Tailwind gradients, CSS shapes, inline SVG inside JSX, emoji, or text-based visuals instead of external image assets.
 - Return complete files using <file path="...">...</file> blocks.
 - Do NOT wrap file contents in markdown fences like \`\`\`javascript.
 - Do NOT include explanations outside the <file> blocks.
-- Do NOT use eval(), Function(), dangerouslySetInnerHTML, or dynamic code execution.
-- Always return complete files, not partial snippets. Even for edits, return the full updated file content.
+- Always return complete files, not partial snippets.
 `;
 
   /**
@@ -520,8 +598,12 @@ Important constraints:
    * The model may suggest many files, but only safe src-level app files are
    * allowed through to disk.
    */
-  const writableFiles = files.filter((file) =>
-    isWritableGeneratedFile(file.path),
+  const writableFiles = Array.from(
+    new Map(
+      files
+        .filter((file) => isWritableGeneratedFile(file.path))
+        .map((file) => [normalizeGeneratedFilePath(file.path), file]),
+    ).values(),
   );
 
   if (writableFiles.length === 0) {
@@ -583,7 +665,7 @@ Important constraints:
     await fs.writeFile(targetPath, content, "utf8");
   }
 
-  await ensureViteRelativeBase();
+  await ensureGeneratedAppScaffold();
 
   const validation = await validateGeneratedApp();
 

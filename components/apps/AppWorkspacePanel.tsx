@@ -11,6 +11,7 @@ type AppWorkspacePanelProps = {
   currentAppSlug: string | null;
   hasGeneratedApp: boolean;
   isLoadingApps: boolean;
+  currentTemplateId: string | null;
   selectedTemplateName: string | null;
   isLoadingTemplates: boolean;
   status: string;
@@ -24,6 +25,7 @@ type AppWorkspacePanelProps = {
   onPublishApp: () => void | Promise<void>;
   onOpenDeleteApp: () => void;
   onSelectTemplate: () => void | Promise<void>;
+  onOpenDeleteTemplate: () => void;
 };
 
 export function AppWorkspacePanel({
@@ -36,6 +38,7 @@ export function AppWorkspacePanel({
   currentAppSlug,
   hasGeneratedApp,
   isLoadingApps,
+  currentTemplateId,
   selectedTemplateName,
   isLoadingTemplates,
   status,
@@ -49,6 +52,7 @@ export function AppWorkspacePanel({
   onPublishApp,
   onOpenDeleteApp,
   onSelectTemplate,
+  onOpenDeleteTemplate,
 }: AppWorkspacePanelProps) {
   return (
     <div className="shrink-0 border-b border-white/10 bg-slate-950/60 px-4 py-4">
@@ -226,6 +230,16 @@ export function AppWorkspacePanel({
               >
                 Launch Application
               </a>
+            )}
+
+            {currentTemplateId && userRole === "platform_admin" && (
+              <button
+                type="button"
+                onClick={onOpenDeleteTemplate}
+                className="mt-3 h-24 w-full flex items-center justify-center rounded-lg border border-red-400/20 bg-red-400/10 text-xs font-bold text-red-200 transition hover:border-red-300/30 hover:bg-red-400/15"
+              >
+                Delete Template
+              </button>
             )}
           </div>
         </div>

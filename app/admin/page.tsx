@@ -18,6 +18,7 @@ import {
   type TemplateSummary,
 } from "@/components/apps/SelectTemplateModal";
 import { VersionHistoryModal } from "@/components/apps/VersionHistoryModal";
+import { DeleteTemplateModal } from "@/components/apps/DeleteTemplateModal";
 import { OutRivalHeader } from "@/components/layout/OutRivalHeader";
 
 import { useAuth } from "@/context/AuthContext";
@@ -84,6 +85,13 @@ export default function AdminHomePage() {
   );
   const [currentTemplateVisibility, setCurrentTemplateVisibility] =
     useState<TemplateVisibility>("public");
+
+  /* Delete template modal state */
+  const [isDeleteTemplateOpen, setIsDeleteTemplateOpen] = useState(false);
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
+  const [deleteTemplateError, setDeleteTemplateError] = useState<string | null>(
+    null,
+  );
 
   const builder = useAppBuilder({
     user,
@@ -308,6 +316,45 @@ export default function AdminHomePage() {
     }
   }
 
+  async function handleDeleteTemplate() {
+    if (!currentTemplateId) return;
+
+    setIsDeletingTemplate(true);
+    setDeleteTemplateError(null);
+
+    try {
+      const response = await fetch(`/api/templates/${currentTemplateId}`, {
+        method: "DELETE",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        setDeleteTemplateError(data.error ?? "Failed to delete template.");
+        return;
+      }
+
+      setTemplates((currentTemplates) =>
+        currentTemplates.filter(
+          (template) => template.id !== currentTemplateId,
+        ),
+      );
+
+      setSelectedTemplateName(null);
+      setCurrentTemplateId(null);
+      setCurrentTemplateVisibility("public");
+      setIsDeleteTemplateOpen(false);
+
+      await builder.handleReset();
+    } catch (error) {
+      setDeleteTemplateError(
+        error instanceof Error ? error.message : "Failed to delete template.",
+      );
+    } finally {
+      setIsDeletingTemplate(false);
+    }
+  }
+
   /**
    * Loads organizations when the admin page first mounts.
    */
@@ -350,6 +397,7 @@ export default function AdminHomePage() {
             userRole={user?.role}
             selectedOrganizationName={selectedOrganization?.name}
             selectedTemplateName={selectedTemplateName}
+            currentTemplateId={currentTemplateId}
             hasSelectedOrganization={Boolean(selectedOrganization)}
             currentAppId={builder.currentAppId}
             currentAppName={builder.currentAppName}
@@ -373,6 +421,10 @@ export default function AdminHomePage() {
             onOpenDeleteApp={() => {
               builder.setDeleteAppError(null);
               builder.setIsDeleteAppOpen(true);
+            }}
+            onOpenDeleteTemplate={() => {
+              setDeleteTemplateError(null);
+              setIsDeleteTemplateOpen(true);
             }}
           />
 
@@ -536,6 +588,18 @@ export default function AdminHomePage() {
           onClose={() => {
             builder.setDeleteAppError(null);
             builder.setIsDeleteAppOpen(false);
+          }}
+        />
+
+        <DeleteTemplateModal
+          isOpen={isDeleteTemplateOpen}
+          templateName={selectedTemplateName}
+          deleteTemplateError={deleteTemplateError}
+          isDeletingTemplate={isDeletingTemplate}
+          onDelete={handleDeleteTemplate}
+          onClose={() => {
+            setDeleteTemplateError(null);
+            setIsDeleteTemplateOpen(false);
           }}
         />
 
